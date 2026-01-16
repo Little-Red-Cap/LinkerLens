@@ -1,9 +1,11 @@
 use serde::{Deserialize, Serialize};
+use sha2::{Digest, Sha256};
 use std::fs;
-use std::io::BufRead;
+use std::io::{BufRead, Read};
 use std::process::Command;
 use std::sync::Mutex;
 
+use crate::fs_utils::write_atomic;
 use crate::toolchain::{resolve_toolchain, ToolchainConfig, ToolchainPaths};
 
 #[derive(Default)]
@@ -103,11 +105,21 @@ pub struct Finding {
 }
 #[tauri::command]
 pub fn analyze_firmware(
+    app: tauri::AppHandle,
     state: tauri::State<'_, AppState>,
     params: AnalyzeParams,
 ) -> Result<AnalysisResult, String> {
     validate_inputs(&params)?;
     let toolchain_paths = resolve_toolchain(params.toolchain.as_ref())?;
+    let cache_key = build_cache_key(&toolchain_paths, &params)?;
+    if let Some(result) = load_cached_result(&app, &cache_key)? {
+        if let Some(symbols) = load_cached_symbols(&app, &cache_key)? {
+            if let Ok(mut stored) = state.symbols.lock() {
+                *stored = symbols;
+            }
+        }
+        return Ok(result);
+    }
 
     let objdump_out = run_command(&toolchain_paths.objdump_path, &["-h", &params.elf_path])?;
     let sections = parse_objdump_sections(&objdump_out);
@@ -135,7 +147,7 @@ pub fn analyze_firmware(
         *stored = all_symbols.clone();
     }
 
-    Ok(AnalysisResult {
+    let result = AnalysisResult {
         meta: AnalysisMeta {
             elf_path: params.elf_path,
             map_path: params.map_path,
@@ -152,7 +164,11 @@ pub fn analyze_firmware(
             findings,
         },
         sections,
-    })
+    };
+
+    store_cached_result(&app, &cache_key, &result)?;
+    store_cached_symbols(&app, &cache_key, &all_symbols)?;
+    Ok(result)
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -655,6 +671,92 @@ fn count_strings_lines(program: &str, elf_path: &str) -> Result<u64, String> {
         return Err("strings command failed".to_string());
     }
     Ok(count)
+}
+
+fn build_cache_key(toolchain: &ToolchainPaths, params: &AnalyzeParams) -> Result<String, String> {
+    let elf_hash = hash_file(&params.elf_path)?;
+    let map_hash = match params.map_path.as_ref().map(|p| p.trim()).filter(|p| !p.is_empty()) {
+        Some(path) => hash_file(path)?,
+        None => String::from("none"),
+    };
+    let tool_sig = format!("{}|{}|{}", toolchain.nm_path, toolchain.objdump_path, toolchain.strings_path);
+    let raw = format!("elf:{}|map:{}|tool:{}", elf_hash, map_hash, tool_sig);
+    Ok(hash_string(&raw))
+}
+
+fn cache_dir(app: &tauri::AppHandle) -> Result<std::path::PathBuf, String> {
+    let base_dir = app
+        .path()
+        .app_config_dir()
+        .map_err(|e| format!("Failed to resolve app config dir: {}", e))?;
+    Ok(base_dir.join("cache"))
+}
+
+fn cache_file_path(app: &tauri::AppHandle, key: &str, suffix: &str) -> Result<std::path::PathBuf, String> {
+    let dir = cache_dir(app)?;
+    Ok(dir.join(format!("{}-{}.json", suffix, key)))
+}
+
+fn load_cached_result(app: &tauri::AppHandle, key: &str) -> Result<Option<AnalysisResult>, String> {
+    let path = cache_file_path(app, key, "analysis")?;
+    if !path.exists() {
+        return Ok(None);
+    }
+    let contents = fs::read_to_string(&path).map_err(|e| format!("Failed to read cache: {}", e))?;
+    let result = serde_json::from_str::<AnalysisResult>(&contents)
+        .map_err(|e| format!("Failed to parse cache: {}", e))?;
+    Ok(Some(result))
+}
+
+fn load_cached_symbols(app: &tauri::AppHandle, key: &str) -> Result<Option<Vec<SymbolInfo>>, String> {
+    let path = cache_file_path(app, key, "symbols")?;
+    if !path.exists() {
+        return Ok(None);
+    }
+    let contents = fs::read_to_string(&path).map_err(|e| format!("Failed to read cache: {}", e))?;
+    let result = serde_json::from_str::<Vec<SymbolInfo>>(&contents)
+        .map_err(|e| format!("Failed to parse cache: {}", e))?;
+    Ok(Some(result))
+}
+
+fn store_cached_result(app: &tauri::AppHandle, key: &str, result: &AnalysisResult) -> Result<(), String> {
+    let path = cache_file_path(app, key, "analysis")?;
+    if let Some(parent) = path.parent() {
+        fs::create_dir_all(parent).map_err(|e| format!("Failed to create cache dir: {}", e))?;
+    }
+    let json = serde_json::to_string(result).map_err(|e| format!("Failed to serialize cache: {}", e))?;
+    write_atomic(&path, json.as_bytes())?;
+    Ok(())
+}
+
+fn store_cached_symbols(app: &tauri::AppHandle, key: &str, symbols: &[SymbolInfo]) -> Result<(), String> {
+    let path = cache_file_path(app, key, "symbols")?;
+    if let Some(parent) = path.parent() {
+        fs::create_dir_all(parent).map_err(|e| format!("Failed to create cache dir: {}", e))?;
+    }
+    let json = serde_json::to_string(symbols).map_err(|e| format!("Failed to serialize cache: {}", e))?;
+    write_atomic(&path, json.as_bytes())?;
+    Ok(())
+}
+
+fn hash_file(path: &str) -> Result<String, String> {
+    let mut file = fs::File::open(path).map_err(|e| format!("Failed to open {}: {}", path, e))?;
+    let mut hasher = Sha256::new();
+    let mut buf = [0u8; 8192];
+    loop {
+        let read = file.read(&mut buf).map_err(|e| e.to_string())?;
+        if read == 0 {
+            break;
+        }
+        hasher.update(&buf[..read]);
+    }
+    Ok(format!("{:x}", hasher.finalize()))
+}
+
+fn hash_string(value: &str) -> String {
+    let mut hasher = Sha256::new();
+    hasher.update(value.as_bytes());
+    format!("{:x}", hasher.finalize())
 }
 
 fn parse_hex_or_dec(value: &str) -> u64 {
