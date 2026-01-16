@@ -34,6 +34,8 @@ export type UiKey =
     | "analysisStatusError"
     | "analysisStatusNone"
     | "analysisStatusDetail"
+    | "analysisSourceMap"
+    | "analysisSourceEstimate"
     | "autoDetectEnabled"
     | "manualToolchain"
     | "language"
@@ -141,6 +143,8 @@ const zh: Record<UiKey, string> = {
     analysisStatusError: "失败",
     analysisStatusNone: "尚未运行",
     analysisStatusDetail: "当前状态：{status}",
+    analysisSourceMap: "来源：MAP",
+    analysisSourceEstimate: "来源：Section 估算",
     autoDetectEnabled: "自动探测已开启",
     manualToolchain: "手动配置工具链",
     language: "语言",
@@ -249,6 +253,8 @@ const en: Record<UiKey, string> = {
     analysisStatusError: "Error",
     analysisStatusNone: "Not run",
     analysisStatusDetail: "Current status: {status}",
+    analysisSourceMap: "Source: MAP",
+    analysisSourceEstimate: "Source: section estimate",
     autoDetectEnabled: "Auto-detect enabled",
     manualToolchain: "Manual toolchain",
     language: "Language",

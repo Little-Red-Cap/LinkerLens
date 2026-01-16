@@ -37,17 +37,23 @@ export default function DashboardPage() {
 
     const flashValue = totals?.flashRegionBytes ?? totals?.flashBytes ?? null;
     const ramValue = totals?.ramRegionBytes ?? totals?.ramBytes ?? null;
+    const flashSource = totals?.flashRegionBytes != null
+        ? uiText(language, "analysisSourceMap")
+        : uiText(language, "analysisSourceEstimate");
+    const ramSource = totals?.ramRegionBytes != null
+        ? uiText(language, "analysisSourceMap")
+        : uiText(language, "analysisSourceEstimate");
 
     const summaryStats = [
         {
             label: uiText(language, "dashFlashUsed"),
             value: formatBytes(flashValue),
-            hint: totals ? "" : uiText(language, "dashAwaiting"),
+            hint: totals ? flashSource : uiText(language, "dashAwaiting"),
         },
         {
             label: uiText(language, "dashRamUsed"),
             value: formatBytes(ramValue),
-            hint: totals ? "" : uiText(language, "dashAwaiting"),
+            hint: totals ? ramSource : uiText(language, "dashAwaiting"),
         },
         {
             label: uiText(language, "dashBss"),
