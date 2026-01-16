@@ -32,6 +32,8 @@ type AnalysisSummary = {
     sections_totals: SectionTotals;
     top_symbols: SymbolInfo[];
     top_objects: ObjectContribution[];
+    top_libraries: ObjectContribution[];
+    top_sections: ObjectContribution[];
 };
 
 type AnalysisResult = {

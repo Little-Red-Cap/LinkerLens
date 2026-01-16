@@ -30,6 +30,8 @@ pub struct AnalysisSummary {
     pub sections_totals: SectionTotals,
     pub top_symbols: Vec<SymbolInfo>,
     pub top_objects: Vec<ObjectContribution>,
+    pub top_libraries: Vec<ObjectContribution>,
+    pub top_sections: Vec<ObjectContribution>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
@@ -82,10 +84,10 @@ pub fn analyze_firmware(params: AnalyzeParams) -> Result<AnalysisResult, String>
     symbols.truncate(50);
 
     let totals = compute_section_totals(&sections);
-    let top_objects = if let Some(map_path) = params.map_path.as_ref() {
-        parse_map_objects(map_path)?
+    let (top_objects, top_libraries, top_sections) = if let Some(map_path) = params.map_path.as_ref() {
+        parse_map_contributions(map_path)?
     } else {
-        Vec::new()
+        (Vec::new(), Vec::new(), Vec::new())
     };
 
     Ok(AnalysisResult {
@@ -98,6 +100,8 @@ pub fn analyze_firmware(params: AnalyzeParams) -> Result<AnalysisResult, String>
             sections_totals: totals,
             top_symbols: symbols,
             top_objects,
+            top_libraries,
+            top_sections,
         },
         sections,
     })
@@ -217,10 +221,14 @@ fn guess_section(kind: &str) -> String {
     .to_string()
 }
 
-fn parse_map_objects(map_path: &str) -> Result<Vec<ObjectContribution>, String> {
+fn parse_map_contributions(
+    map_path: &str,
+) -> Result<(Vec<ObjectContribution>, Vec<ObjectContribution>, Vec<ObjectContribution>), String> {
     let contents =
         fs::read_to_string(map_path).map_err(|e| format!("Failed to read MAP file {}: {}", map_path, e))?;
-    let mut totals: std::collections::HashMap<String, u64> = std::collections::HashMap::new();
+    let mut objects: std::collections::HashMap<String, u64> = std::collections::HashMap::new();
+    let mut libraries: std::collections::HashMap<String, u64> = std::collections::HashMap::new();
+    let mut sections: std::collections::HashMap<String, u64> = std::collections::HashMap::new();
 
     for line in contents.lines() {
         let trimmed = line.trim_start();
@@ -229,6 +237,7 @@ fn parse_map_objects(map_path: &str) -> Result<Vec<ObjectContribution>, String> 
             if parts.len() < 4 {
                 continue;
             }
+            let section_name = parts.get(0).unwrap_or(&"");
             let size_hex = parts.get(2).unwrap_or(&"");
             let size = u64::from_str_radix(size_hex.trim_start_matches("0x"), 16).unwrap_or(0);
             if size == 0 {
@@ -241,18 +250,55 @@ fn parse_map_objects(map_path: &str) -> Result<Vec<ObjectContribution>, String> 
             if !file.contains(".o") && !file.contains(".a") {
                 continue;
             }
-            let entry = totals.entry((*file).to_string()).or_insert(0);
-            *entry += size;
+            let object_entry = objects.entry((*file).to_string()).or_insert(0);
+            *object_entry += size;
+
+            if let Some(library_name) = extract_library_name(file) {
+                let lib_entry = libraries.entry(library_name).or_insert(0);
+                *lib_entry += size;
+            }
+
+            let section_entry = sections.entry((*section_name).to_string()).or_insert(0);
+            *section_entry += size;
         }
     }
 
-    let mut result: Vec<ObjectContribution> = totals
+    let top_objects = top_contributions(objects, 20);
+    let top_libraries = top_contributions(libraries, 12);
+    let top_sections = top_contributions(sections, 8);
+
+    Ok((top_objects, top_libraries, top_sections))
+}
+
+fn top_contributions(map: std::collections::HashMap<String, u64>, limit: usize) -> Vec<ObjectContribution> {
+    let mut result: Vec<ObjectContribution> = map
         .into_iter()
         .map(|(name, size)| ObjectContribution { name, size })
         .collect();
     result.sort_by(|a, b| b.size.cmp(&a.size));
-    if result.len() > 20 {
-        result.truncate(20);
+    if result.len() > limit {
+        result.truncate(limit);
     }
-    Ok(result)
+    result
+}
+
+fn extract_library_name(path: &str) -> Option<String> {
+    if let Some(start) = path.find('(') {
+        if let Some(end) = path[start + 1..].find(')') {
+            let lib_path = &path[..start];
+            if lib_path.contains(".a") {
+                let name = lib_path.split(|c| c == '/' || c == '\\').last().unwrap_or(lib_path);
+                return Some(name.to_string());
+            }
+            let inner = &path[start + 1..start + 1 + end];
+            if inner.contains(".a") {
+                return Some(inner.to_string());
+            }
+        }
+    }
+    if path.contains(".a") && path.contains("/") {
+        let name = path.split(|c| c == '/' || c == '\\').last().unwrap_or(path);
+        return Some(name.to_string());
+    }
+    None
 }

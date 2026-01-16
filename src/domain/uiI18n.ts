@@ -82,6 +82,11 @@ export type UiKey =
     | "objectsMapEmpty"
     | "objectsTopTitle"
     | "objectsTopHint"
+    | "objectsTopEmpty"
+    | "objectsLibrariesTitle"
+    | "objectsLibrariesHint"
+    | "objectsSectionsTitle"
+    | "objectsSectionsHint"
     | "objectsZeroSymbols"
     | "findingsStatusNotRun"
     | "findingsRuleSizeTitle"
@@ -175,8 +180,13 @@ const zh: Record<UiKey, string> = {
     objectsMapTitle: "贡献树图",
     objectsMapHint: "Treemap 展示库、对象文件与段的层级关系。",
     objectsMapEmpty: "MAP 解析后显示 Treemap。",
-    objectsTopTitle: "主要贡献者",
-    objectsTopHint: "定位最占空间的库与对象文件。",
+    objectsTopTitle: "对象贡献 Top",
+    objectsTopHint: "按对象文件聚合的体积排行。",
+    objectsTopEmpty: "暂无对象贡献数据",
+    objectsLibrariesTitle: "库贡献 Top",
+    objectsLibrariesHint: "按库文件聚合的体积排行。",
+    objectsSectionsTitle: "段贡献 Top",
+    objectsSectionsHint: "按段名称聚合的体积排行。",
     objectsZeroSymbols: "0 个符号",
     findingsStatusNotRun: "未运行",
     findingsRuleSizeTitle: "固件体积过大",
@@ -271,8 +281,13 @@ const en: Record<UiKey, string> = {
     objectsMapTitle: "Contribution Map",
     objectsMapHint: "Treemap view of libraries, object files, and sections.",
     objectsMapEmpty: "Treemap will appear after MAP parsing.",
-    objectsTopTitle: "Top Contributors",
-    objectsTopHint: "Drill into objects to find heavy hitters.",
+    objectsTopTitle: "Top Objects",
+    objectsTopHint: "Aggregated size by object file.",
+    objectsTopEmpty: "No object data yet",
+    objectsLibrariesTitle: "Top Libraries",
+    objectsLibrariesHint: "Aggregated size by library.",
+    objectsSectionsTitle: "Top Sections",
+    objectsSectionsHint: "Aggregated size by section name.",
     objectsZeroSymbols: "0 symbols",
     findingsStatusNotRun: "Not run",
     findingsRuleSizeTitle: "Firmware too large",
