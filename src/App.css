@@ -113,13 +113,28 @@
   z-index: 1;
   min-height: calc(100vh - 64px);
   display: flex;
+  flex-direction: row;
+}
+
+.appBody.ant-layout {
+  flex-direction: row;
+}
+
+.appBody.isCompact {
+  flex-direction: column;
 }
 
 .appNav {
   width: 220px;
+  flex: 0 0 220px;
   background: transparent;
   border-right: 1px solid var(--border);
   padding: 16px 12px;
+  position: sticky;
+  top: 64px;
+  align-self: flex-start;
+  height: calc(100vh - 64px);
+  overflow: auto;
 }
 
 .appNav .ant-menu {
@@ -131,6 +146,9 @@
   width: 100%;
   border-right: none;
   border-bottom: 1px solid var(--border);
+  position: static;
+  height: auto;
+  overflow: visible;
 }
 
 .appNav.isCompact .ant-menu {
@@ -138,6 +156,8 @@
 }
 
 .appContent {
+  flex: 1;
+  min-width: 0;
   padding: 28px 32px 48px;
 }
 
@@ -237,7 +257,7 @@
 
 .progressRow {
   display: grid;
-  grid-template-columns: 80px 1fr;
+  grid-template-columns: 160px 1fr;
   align-items: center;
   gap: 12px;
 }

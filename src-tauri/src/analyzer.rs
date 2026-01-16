@@ -4,7 +4,7 @@ use std::fs;
 use std::io::{BufRead, Read};
 use std::process::Command;
 use std::sync::Mutex;
-
+use tauri::Manager;
 use crate::fs_utils::write_atomic;
 use crate::toolchain::{resolve_toolchain, ToolchainConfig, ToolchainPaths};
 
@@ -550,13 +550,13 @@ fn parse_memory_regions(contents: &str) -> Vec<MemoryRegion> {
                 break;
             }
             let parts: Vec<&str> = trimmed.split_whitespace().collect();
-            if parts.len() < 4 {
+            if parts.len() < 3 {
                 continue;
             }
             let name = parts[0].to_string();
             let origin = parts[1].to_string();
             let length = parse_hex_or_dec(parts[2]);
-            let used = parts.get(3).map(|v| parse_hex_or_dec(v)).unwrap_or(0);
+            let used = find_used_value(&parts).unwrap_or(0);
             regions.push(MemoryRegion {
                 name,
                 origin,
@@ -567,6 +567,22 @@ fn parse_memory_regions(contents: &str) -> Vec<MemoryRegion> {
     }
 
     regions
+}
+
+fn find_used_value(parts: &[&str]) -> Option<u64> {
+    for part in parts.iter().rev() {
+        if let Some(value) = parse_optional_number(part) {
+            return Some(value);
+        }
+    }
+    None
+}
+
+fn parse_optional_number(value: &str) -> Option<u64> {
+    if let Some(hex) = value.strip_prefix("0x") {
+        return u64::from_str_radix(hex, 16).ok();
+    }
+    value.parse::<u64>().ok()
 }
 
 fn apply_region_totals(mut totals: SectionTotals, regions: &[MemoryRegion]) -> SectionTotals {
@@ -689,13 +705,14 @@ fn count_strings_lines(program: &str, elf_path: &str) -> Result<u64, String> {
 }
 
 fn build_cache_key(toolchain: &ToolchainPaths, params: &AnalyzeParams) -> Result<String, String> {
+    let cache_version = "v2";
     let elf_hash = hash_file(&params.elf_path)?;
     let map_hash = match params.map_path.as_ref().map(|p| p.trim()).filter(|p| !p.is_empty()) {
         Some(path) => hash_file(path)?,
         None => String::from("none"),
     };
     let tool_sig = format!("{}|{}|{}", toolchain.nm_path, toolchain.objdump_path, toolchain.strings_path);
-    let raw = format!("elf:{}|map:{}|tool:{}", elf_hash, map_hash, tool_sig);
+    let raw = format!("ver:{}|elf:{}|map:{}|tool:{}", cache_version, elf_hash, map_hash, tool_sig);
     Ok(hash_string(&raw))
 }
 

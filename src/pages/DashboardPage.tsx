@@ -38,6 +38,8 @@ export default function DashboardPage() {
 
     const flashValue = totals?.flashRegionBytes ?? totals?.flashBytes ?? null;
     const ramValue = totals?.ramRegionBytes ?? totals?.ramBytes ?? null;
+    const flashBase = totals?.flashRegionBytes ?? totals?.flashBytes ?? 0;
+    const ramBase = totals?.ramRegionBytes ?? totals?.ramBytes ?? 0;
     const flashSource = totals?.flashRegionBytes != null
         ? uiText(language, "analysisSourceMap")
         : uiText(language, "analysisSourceEstimate");
@@ -82,9 +84,20 @@ export default function DashboardPage() {
     })();
 
     const topSymbolColumns = [
-        { title: uiText(language, "symbolsColumnSymbol"), dataIndex: "name", key: "name" },
-        { title: uiText(language, "symbolsColumnSize"), dataIndex: "size", key: "size" },
-        { title: uiText(language, "symbolsColumnSection"), dataIndex: "section_guess", key: "section" },
+        {
+            title: uiText(language, "symbolsColumnSymbol"),
+            dataIndex: "name",
+            key: "name",
+            ellipsis: true,
+        },
+        {
+            title: uiText(language, "symbolsColumnSize"),
+            dataIndex: "size",
+            key: "size",
+            render: (value: number) => formatBytes(value),
+            width: 120,
+        },
+        { title: uiText(language, "symbolsColumnSection"), dataIndex: "section_guess", key: "section", width: 120 },
     ];
 
     const regionColumns = [
@@ -198,30 +211,30 @@ export default function DashboardPage() {
                         <Divider />
                         <Space direction="vertical" size="small" className="progressStack">
                             <div className="progressRow">
-                                <span>.text</span>
+                                <span>.text {formatBytes(totals?.textBytes ?? null)}</span>
                                 <Progress
-                                    percent={totals?.textBytes ? (totals.textBytes / (totals.flashBytes || 1)) * 100 : 0}
+                                    percent={totals?.textBytes ? (totals.textBytes / (flashBase || 1)) * 100 : 0}
                                     showInfo={false}
                                 />
                             </div>
                             <div className="progressRow">
-                                <span>.rodata</span>
+                                <span>.rodata {formatBytes(totals?.rodataBytes ?? null)}</span>
                                 <Progress
-                                    percent={totals?.rodataBytes ? (totals.rodataBytes / (totals.flashBytes || 1)) * 100 : 0}
+                                    percent={totals?.rodataBytes ? (totals.rodataBytes / (flashBase || 1)) * 100 : 0}
                                     showInfo={false}
                                 />
                             </div>
                             <div className="progressRow">
-                                <span>.data</span>
+                                <span>.data {formatBytes(totals?.dataBytes ?? null)}</span>
                                 <Progress
-                                    percent={totals?.dataBytes ? (totals.dataBytes / (totals.flashBytes || 1)) * 100 : 0}
+                                    percent={totals?.dataBytes ? (totals.dataBytes / (flashBase || 1)) * 100 : 0}
                                     showInfo={false}
                                 />
                             </div>
                             <div className="progressRow">
-                                <span>.bss</span>
+                                <span>.bss {formatBytes(totals?.bssBytes ?? null)}</span>
                                 <Progress
-                                    percent={totals?.bssBytes ? (totals.bssBytes / (totals.ramBytes || 1)) * 100 : 0}
+                                    percent={totals?.bssBytes ? (totals.bssBytes / (ramBase || 1)) * 100 : 0}
                                     showInfo={false}
                                 />
                             </div>

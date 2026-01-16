@@ -294,7 +294,7 @@ export default function App() {
                         </Space>
                     </div>
                 </Header>
-                <Layout className="appBody">
+                <Layout className={`appBody ${isCompact ? "isCompact" : ""}`}>
                     <aside className={`appNav ${isCompact ? "isCompact" : ""}`}>
                         <Menu
                             mode={isCompact ? "horizontal" : "inline"}
