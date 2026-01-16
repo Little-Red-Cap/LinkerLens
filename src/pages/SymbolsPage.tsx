@@ -30,10 +30,22 @@ export default function SymbolsPage() {
     const [loading, setLoading] = useState(false);
 
     const columns = [
-        { title: uiText(language, "symbolsColumnSymbol"), dataIndex: "name", key: "name" },
-        { title: uiText(language, "symbolsColumnSize"), dataIndex: "size", key: "size" },
-        { title: uiText(language, "symbolsColumnType"), dataIndex: "kind", key: "type" },
-        { title: uiText(language, "symbolsColumnSection"), dataIndex: "section_guess", key: "section" },
+        {
+            title: uiText(language, "symbolsColumnSymbol"),
+            dataIndex: "name",
+            key: "name",
+            ellipsis: true,
+            width: 360,
+        },
+        { title: uiText(language, "symbolsColumnSize"), dataIndex: "size", key: "size", width: 120 },
+        { title: uiText(language, "symbolsColumnType"), dataIndex: "kind", key: "type", width: 90 },
+        {
+            title: uiText(language, "symbolsColumnSection"),
+            dataIndex: "section_guess",
+            key: "section",
+            ellipsis: true,
+            width: 140,
+        },
     ];
 
     useEffect(() => {
@@ -118,6 +130,8 @@ export default function SymbolsPage() {
                     dataSource={data}
                     rowKey={(row) => `${row.name}-${row.addr ?? ""}`}
                     loading={loading}
+                    tableLayout="fixed"
+                    className="symbolsTable"
                     pagination={{
                         current: page,
                         pageSize,

@@ -178,6 +178,14 @@
   background: transparent;
 }
 
+.symbolsTable .ant-table {
+  table-layout: fixed;
+}
+
+.symbolsTable .ant-table-cell {
+  white-space: nowrap;
+}
+
 .cardHint {
   display: block;
   margin-top: 6px;
