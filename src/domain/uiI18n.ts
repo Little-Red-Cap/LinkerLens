@@ -6,11 +6,13 @@ export type UiKey =
     | "navSymbols"
     | "navObjects"
     | "navFindings"
+    | "navLookup"
     | "navSettings"
     | "pageDashboard"
     | "pageSymbols"
     | "pageObjects"
     | "pageFindings"
+    | "pageLookup"
     | "pageSettings"
     | "toolchainReady"
     | "toolchainMissing"
@@ -38,6 +40,12 @@ export type UiKey =
     | "analysisSourceEstimate"
     | "analysisCacheHit"
     | "analysisCacheMiss"
+    | "lookupTitle"
+    | "lookupHint"
+    | "lookupPlaceholder"
+    | "lookupNeedAnalysis"
+    | "lookupNotFound"
+    | "lookupOffset"
     | "autoDetectEnabled"
     | "manualToolchain"
     | "language"
@@ -123,11 +131,13 @@ const zh: Record<UiKey, string> = {
     navSymbols: "符号",
     navObjects: "对象与映射",
     navFindings: "问题扫描",
+    navLookup: "地址反查",
     navSettings: "设置",
     pageDashboard: "仪表盘",
     pageSymbols: "符号分析",
     pageObjects: "对象与映射",
     pageFindings: "问题扫描",
+    pageLookup: "地址反查",
     pageSettings: "设置",
     toolchainReady: "工具链已就绪",
     toolchainMissing: "工具链未配置",
@@ -155,6 +165,12 @@ const zh: Record<UiKey, string> = {
     analysisSourceEstimate: "来源：Section 估算",
     analysisCacheHit: "缓存命中",
     analysisCacheMiss: "新鲜计算",
+    lookupTitle: "PC 地址反查",
+    lookupHint: "输入 PC 地址（十六进制或十进制）以定位函数符号。",
+    lookupPlaceholder: "例如：0x08001234",
+    lookupNeedAnalysis: "请先运行分析以加载符号表",
+    lookupNotFound: "未找到匹配符号",
+    lookupOffset: "偏移",
     autoDetectEnabled: "自动探测已开启",
     manualToolchain: "手动配置工具链",
     language: "语言",
@@ -241,11 +257,13 @@ const en: Record<UiKey, string> = {
     navSymbols: "Symbols",
     navObjects: "Objects & Map",
     navFindings: "Findings",
+    navLookup: "Lookup",
     navSettings: "Settings",
     pageDashboard: "Dashboard",
     pageSymbols: "Symbols",
     pageObjects: "Objects & Map",
     pageFindings: "Findings",
+    pageLookup: "Lookup",
     pageSettings: "Settings",
     toolchainReady: "Toolchain Ready",
     toolchainMissing: "Toolchain Missing",
@@ -273,6 +291,12 @@ const en: Record<UiKey, string> = {
     analysisSourceEstimate: "Source: section estimate",
     analysisCacheHit: "Cache hit",
     analysisCacheMiss: "Computed",
+    lookupTitle: "PC Lookup",
+    lookupHint: "Enter a PC address (hex or decimal) to resolve the symbol.",
+    lookupPlaceholder: "e.g. 0x08001234",
+    lookupNeedAnalysis: "Please run analysis to load symbols",
+    lookupNotFound: "No matching symbol found",
+    lookupOffset: "Offset",
     autoDetectEnabled: "Auto-detect enabled",
     manualToolchain: "Manual toolchain",
     language: "Language",

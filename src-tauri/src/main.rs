@@ -21,7 +21,8 @@ fn main() {
             system_fonts::list_system_fonts,
             toolchain::detect_toolchain,
             analyzer::analyze_firmware,
-            analyzer::list_symbols
+            analyzer::list_symbols,
+            analyzer::lookup_pc
         ])
         .run(tauri::generate_context!())
         .expect("Failed to run Tauri application");

@@ -24,12 +24,14 @@ import {
     PlayCircleOutlined,
     SettingOutlined,
     TableOutlined,
+    AimOutlined,
 } from "@ant-design/icons";
 import DashboardPage from "../pages/DashboardPage";
 import FindingsPage from "../pages/FindingsPage";
 import ObjectsPage from "../pages/ObjectsPage";
 import SettingsPage from "../pages/SettingsPage";
 import SymbolsPage from "../pages/SymbolsPage";
+import LookupPage from "../pages/LookupPage";
 import { uiText } from "../domain/uiI18n";
 import { useAnalysisStore } from "../store/analysis.store";
 import { useSettingsStore } from "../store/settings.store";
@@ -38,40 +40,7 @@ import "../App.css";
 
 const { Header, Content } = Layout;
 
-type PageKey = "dashboard" | "symbols" | "objects" | "findings" | "settings";
-
-type AnalyzeParams = {
-    elf_path: string;
-    map_path?: string | null;
-    toolchain?: {
-        auto_detect: boolean;
-        toolchain_root?: string | null;
-        nm_path?: string | null;
-        objdump_path?: string | null;
-        strings_path?: string | null;
-    };
-};
-
-type ToolchainCandidate = {
-    source: string;
-    paths: {
-        nm_path: string;
-        objdump_path: string;
-        strings_path: string;
-    };
-};
-
-const deriveRootFromNm = (nmPath: string) => {
-    const normalized = nmPath.replace(/\\/g, "/");
-    const parts = normalized.split("/");
-    if (parts.length < 3) return "";
-    if (parts[parts.length - 1].startsWith("arm-none-eabi-nm")) {
-        const rootParts = parts.slice(0, -2);
-        const root = rootParts.join("/");
-        return nmPath.includes("\\") ? root.replace(/\//g, "\\") : root;
-    }
-    return "";
-};
+type PageKey = "dashboard" | "symbols" | "objects" | "findings" | "settings" | "lookup";
 
 export default function App() {
     const [activePage, setActivePage] = useState<PageKey>("dashboard");
@@ -99,6 +68,7 @@ export default function App() {
         objects: uiText(language, "pageObjects"),
         findings: uiText(language, "pageFindings"),
         settings: uiText(language, "pageSettings"),
+        lookup: uiText(language, "pageLookup"),
     };
 
     const menuItems = [
@@ -106,6 +76,7 @@ export default function App() {
         { key: "symbols", label: uiText(language, "navSymbols"), icon: <TableOutlined /> },
         { key: "objects", label: uiText(language, "navObjects"), icon: <ApartmentOutlined /> },
         { key: "findings", label: uiText(language, "navFindings"), icon: <AlertOutlined /> },
+        { key: "lookup", label: uiText(language, "navLookup"), icon: <AimOutlined /> },
         { key: "settings", label: uiText(language, "navSettings"), icon: <SettingOutlined /> },
     ];
 
@@ -121,6 +92,8 @@ export default function App() {
                 return <FindingsPage />;
             case "settings":
                 return <SettingsPage />;
+            case "lookup":
+                return <LookupPage />;
             default:
                 return null;
         }
@@ -286,7 +259,7 @@ export default function App() {
                                     className="langSelect"
                                 />
                             </Space>
-                            <Tooltip title={uiText(language, "analysisHint")}> 
+                            <Tooltip title={uiText(language, "analysisHint")}>
                                 <Button type="primary" icon={<PlayCircleOutlined />} onClick={startAnalysis}>
                                     {uiText(language, "newAnalysis")}
                                 </Button>

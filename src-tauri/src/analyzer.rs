@@ -110,6 +110,22 @@ pub struct CacheMeta {
     pub hit: bool,
     pub key: String,
 }
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PcLookupResult {
+    pub address: String,
+    pub symbol: Option<PcLookupSymbol>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PcLookupSymbol {
+    pub name: String,
+    pub addr: String,
+    pub size: u64,
+    pub kind: String,
+    pub section_guess: String,
+    pub offset: u64,
+}
 #[tauri::command]
 pub fn analyze_firmware(
     app: tauri::AppHandle,
@@ -248,6 +264,51 @@ pub fn list_symbols(state: tauri::State<'_, AppState>, query: SymbolQuery) -> Re
     };
 
     Ok(PagedSymbols { total, items: paged })
+}
+
+#[tauri::command]
+pub fn lookup_pc(state: tauri::State<'_, AppState>, address: String) -> Result<PcLookupResult, String> {
+    let addr_value = parse_pc_address(&address)?;
+    let data = state.symbols.lock().map_err(|_| "Failed to read symbols cache.".to_string())?;
+    if data.is_empty() {
+        return Err("Symbol cache is empty. Run analysis first.".to_string());
+    }
+
+    let mut best: Option<(u64, &SymbolInfo)> = None;
+    for symbol in data.iter() {
+        let addr_str = match symbol.addr.as_ref() {
+            Some(value) => value,
+            None => continue,
+        };
+        let start = match parse_hex_str(addr_str) {
+            Some(value) => value,
+            None => continue,
+        };
+        if symbol.size == 0 {
+            continue;
+        }
+        let end = start.saturating_add(symbol.size);
+        if addr_value >= start && addr_value < end {
+            match best {
+                Some((best_start, _)) if best_start >= start => {}
+                _ => best = Some((start, symbol)),
+            }
+        }
+    }
+
+    let symbol = best.map(|(start, symbol)| PcLookupSymbol {
+        name: symbol.name.clone(),
+        addr: symbol.addr.clone().unwrap_or_else(|| format!("{:x}", start)),
+        size: symbol.size,
+        kind: symbol.kind.clone(),
+        section_guess: symbol.section_guess.clone(),
+        offset: addr_value.saturating_sub(start),
+    });
+
+    Ok(PcLookupResult {
+        address,
+        symbol,
+    })
 }
 
 fn validate_inputs(params: &AnalyzeParams) -> Result<(), String> {
@@ -806,4 +867,29 @@ fn parse_hex_or_dec(value: &str) -> u64 {
     } else {
         value.parse::<u64>().unwrap_or(0)
     }
+}
+
+fn parse_pc_address(value: &str) -> Result<u64, String> {
+    let trimmed = value.trim();
+    if trimmed.is_empty() {
+        return Err("Address is required.".to_string());
+    }
+    let lowered = trimmed.to_ascii_lowercase();
+    let (radix, digits) = if let Some(rest) = lowered.strip_prefix("0x") {
+        (16, rest)
+    } else if lowered.chars().any(|c| matches!(c, 'a'..='f')) {
+        (16, lowered.as_str())
+    } else {
+        (10, trimmed)
+    };
+    if digits.is_empty() {
+        return Err("Invalid address.".to_string());
+    }
+    u64::from_str_radix(digits, radix).map_err(|_| "Invalid address.".to_string())
+}
+
+fn parse_hex_str(value: &str) -> Option<u64> {
+    let trimmed = value.trim();
+    let digits = trimmed.strip_prefix("0x").unwrap_or(trimmed);
+    u64::from_str_radix(digits, 16).ok()
 }
