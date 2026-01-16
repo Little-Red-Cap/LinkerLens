@@ -1,5 +1,6 @@
 ﻿import { Button, Card, Col, Form, Input, Row, Select, Space, Switch, Typography } from "antd";
-import { useEffect } from "react";
+import { open } from "@tauri-apps/plugin-dialog";
+import { useCallback, useEffect } from "react";
 import { uiText } from "../domain/uiI18n";
 import { useSettingsStore } from "../store/settings.store";
 import { useUiStore } from "../store/ui.store";
@@ -18,6 +19,27 @@ export default function SettingsPage() {
         form.setFieldsValue(toolchain);
     }, [form, toolchain]);
 
+    const handleBrowseRoot = useCallback(async () => {
+        const selected = await open({ directory: true, multiple: false });
+        const root = Array.isArray(selected) ? selected[0] : selected;
+        if (!root || typeof root !== "string") return;
+
+        const separator = root.includes("\\") ? "\\" : "/";
+        const cleanedRoot = root.replace(/[\\/]+$/, "");
+        const binRoot = cleanedRoot.toLowerCase().endsWith(`${separator}bin`)
+            ? cleanedRoot
+            : `${cleanedRoot}${separator}bin`;
+        const isWindows = /^[a-zA-Z]:\\/.test(cleanedRoot);
+        const exe = isWindows ? ".exe" : "";
+
+        updateToolchain({
+            toolchainRoot: cleanedRoot,
+            nmPath: toolchain.nmPath || `${binRoot}${separator}arm-none-eabi-nm${exe}`,
+            objdumpPath: toolchain.objdumpPath || `${binRoot}${separator}arm-none-eabi-objdump${exe}`,
+            stringsPath: toolchain.stringsPath || `${binRoot}${separator}arm-none-eabi-strings${exe}`,
+        });
+    }, [toolchain.nmPath, toolchain.objdumpPath, toolchain.stringsPath, updateToolchain]);
+
     return (
         <Space direction="vertical" size="large" className="pageStack">
             <Card className="pageCard riseIn">
@@ -34,7 +56,11 @@ export default function SettingsPage() {
                 >
                     <Row gutter={[16, 12]}>
                         <Col xs={24} md={12}>
-                            <Form.Item label={uiText(language, "settingsAutoDetect")} name="autoDetect" valuePropName="checked">
+                            <Form.Item
+                                label={uiText(language, "settingsAutoDetect")}
+                                name="autoDetect"
+                                valuePropName="checked"
+                            >
                                 <Switch />
                             </Form.Item>
                         </Col>
@@ -65,7 +91,7 @@ export default function SettingsPage() {
                         </Col>
                         <Col xs={24}>
                             <Space>
-                                <Button disabled>{uiText(language, "settingsBrowse")}</Button>
+                                <Button onClick={handleBrowseRoot}>{uiText(language, "settingsBrowse")}</Button>
                                 <Button onClick={resetToolchain}>{uiText(language, "settingsReset")}</Button>
                             </Space>
                         </Col>

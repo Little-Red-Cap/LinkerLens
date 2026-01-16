@@ -14,6 +14,7 @@ import {
     Typography,
     theme as antdTheme,
 } from "antd";
+import { open } from "@tauri-apps/plugin-dialog";
 import {
     AlertOutlined,
     ApartmentOutlined,
@@ -28,6 +29,7 @@ import ObjectsPage from "../pages/ObjectsPage";
 import SettingsPage from "../pages/SettingsPage";
 import SymbolsPage from "../pages/SymbolsPage";
 import { uiText } from "../domain/uiI18n";
+import { useAnalysisStore } from "../store/analysis.store";
 import { useSettingsStore } from "../store/settings.store";
 import { useUiStore } from "../store/ui.store";
 import "../App.css";
@@ -45,6 +47,7 @@ export default function App() {
     const language = useUiStore((s) => s.language);
     const setTheme = useUiStore((s) => s.setTheme);
     const setLanguage = useUiStore((s) => s.setLanguage);
+    const setInputs = useAnalysisStore((s) => s.setInputs);
 
     useEffect(() => {
         document.documentElement.dataset.theme = themeMode;
@@ -87,6 +90,30 @@ export default function App() {
     const hasToolchain = Boolean(
         toolchain.toolchainRoot || toolchain.nmPath || toolchain.objdumpPath || toolchain.stringsPath,
     );
+
+    const startAnalysis = async () => {
+        const elfSelected = await open({
+            title: uiText(language, "analysisSelectElfTitle"),
+            multiple: false,
+            filters: [{ name: "ELF", extensions: ["elf"] }],
+        });
+        const elfPath = Array.isArray(elfSelected) ? elfSelected[0] : elfSelected;
+        if (!elfPath || typeof elfPath !== "string") return;
+
+        setInputs({ elfPath });
+
+        const mapSelected = await open({
+            title: uiText(language, "analysisSelectMapTitle"),
+            multiple: false,
+            filters: [{ name: "MAP", extensions: ["map"] }],
+        });
+        const mapPath = Array.isArray(mapSelected) ? mapSelected[0] : mapSelected;
+        if (mapPath && typeof mapPath === "string") {
+            setInputs({ mapPath });
+        }
+
+        setActivePage("dashboard");
+    };
 
     return (
         <ConfigProvider
@@ -138,7 +165,7 @@ export default function App() {
                                 />
                             </Space>
                             <Tooltip title={uiText(language, "analysisHint")}>
-                                <Button type="primary" icon={<PlayCircleOutlined />} disabled>
+                                <Button type="primary" icon={<PlayCircleOutlined />} onClick={startAnalysis}>
                                     {uiText(language, "newAnalysis")}
                                 </Button>
                             </Tooltip>

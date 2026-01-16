@@ -200,6 +200,23 @@
   gap: 12px;
 }
 
+.pathList {
+  width: 100%;
+}
+
+.pathRow {
+  display: grid;
+  grid-template-columns: 48px 1fr;
+  gap: 12px;
+  align-items: baseline;
+}
+
+.pathValue {
+  color: var(--muted);
+  font-size: 13px;
+  word-break: break-all;
+}
+
 .listHint {
   display: block;
 }

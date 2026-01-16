@@ -1,9 +1,11 @@
 ﻿import { Card, Col, Divider, Empty, Progress, Row, Space, Statistic, Table, Typography } from "antd";
 import { uiText } from "../domain/uiI18n";
+import { useAnalysisStore } from "../store/analysis.store";
 import { useUiStore } from "../store/ui.store";
 
 export default function DashboardPage() {
     const language = useUiStore((s) => s.language);
+    const inputs = useAnalysisStore((s) => s.inputs);
     const summaryStats = [
         { label: uiText(language, "dashFlashUsed"), value: "--", hint: uiText(language, "dashAwaiting") },
         { label: uiText(language, "dashRamUsed"), value: "--", hint: uiText(language, "dashAwaiting") },
@@ -32,9 +34,29 @@ export default function DashboardPage() {
                 ))}
             </Row>
 
+            <Card className="pageCard riseIn" style={{ animationDelay: "120ms" }}>
+                <Typography.Title level={4}>{uiText(language, "dashInputTitle")}</Typography.Title>
+                <Typography.Text type="secondary">{uiText(language, "dashInputHint")}</Typography.Text>
+                <Divider />
+                <Space direction="vertical" size="small" className="pathList">
+                    <div className="pathRow">
+                        <Typography.Text strong>{uiText(language, "analysisElfLabel")}</Typography.Text>
+                        <Typography.Text className="pathValue">
+                            {inputs.elfPath || uiText(language, "analysisNotSet")}
+                        </Typography.Text>
+                    </div>
+                    <div className="pathRow">
+                        <Typography.Text strong>{uiText(language, "analysisMapLabel")}</Typography.Text>
+                        <Typography.Text className="pathValue">
+                            {inputs.mapPath || uiText(language, "analysisNotSet")}
+                        </Typography.Text>
+                    </div>
+                </Space>
+            </Card>
+
             <Row gutter={[16, 16]}>
                 <Col xs={24} lg={14}>
-                    <Card className="pageCard riseIn" style={{ animationDelay: "160ms" }}>
+                    <Card className="pageCard riseIn" style={{ animationDelay: "180ms" }}>
                         <Typography.Title level={4}>
                             {uiText(language, "dashSectionFootprintTitle")}
                         </Typography.Title>

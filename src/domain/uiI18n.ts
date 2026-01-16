@@ -16,6 +16,11 @@ export type UiKey =
     | "toolchainMissing"
     | "newAnalysis"
     | "analysisHint"
+    | "analysisSelectElfTitle"
+    | "analysisSelectMapTitle"
+    | "analysisElfLabel"
+    | "analysisMapLabel"
+    | "analysisNotSet"
     | "autoDetectEnabled"
     | "manualToolchain"
     | "language"
@@ -45,6 +50,8 @@ export type UiKey =
     | "dashTopSymbolsTitle"
     | "dashTopSymbolsHint"
     | "dashTopSymbolsEmpty"
+    | "dashInputTitle"
+    | "dashInputHint"
     | "symbolsSearchPlaceholder"
     | "symbolsSectionPlaceholder"
     | "symbolsTypePlaceholder"
@@ -90,6 +97,11 @@ const zh: Record<UiKey, string> = {
     toolchainMissing: "工具链未配置",
     newAnalysis: "新建分析",
     analysisHint: "选择 ELF 和 MAP 后即可开始分析。",
+    analysisSelectElfTitle: "选择固件 ELF",
+    analysisSelectMapTitle: "选择 MAP 文件（可选）",
+    analysisElfLabel: "ELF",
+    analysisMapLabel: "MAP",
+    analysisNotSet: "未选择",
     autoDetectEnabled: "自动探测已开启",
     manualToolchain: "手动配置工具链",
     language: "语言",
@@ -119,6 +131,8 @@ const zh: Record<UiKey, string> = {
     dashTopSymbolsTitle: "Top 符号",
     dashTopSymbolsHint: "按体积排序的最大函数或对象。",
     dashTopSymbolsEmpty: "运行分析后填充符号列表。",
+    dashInputTitle: "分析输入",
+    dashInputHint: "当前选择的固件与映射文件。",
     symbolsSearchPlaceholder: "搜索符号名或正则",
     symbolsSectionPlaceholder: "段",
     symbolsTypePlaceholder: "类型",
@@ -165,6 +179,11 @@ const en: Record<UiKey, string> = {
     toolchainMissing: "Toolchain Missing",
     newAnalysis: "New Analysis",
     analysisHint: "Select an ELF and MAP file to start analysis.",
+    analysisSelectElfTitle: "Select ELF firmware",
+    analysisSelectMapTitle: "Select MAP file (optional)",
+    analysisElfLabel: "ELF",
+    analysisMapLabel: "MAP",
+    analysisNotSet: "Not set",
     autoDetectEnabled: "Auto-detect enabled",
     manualToolchain: "Manual toolchain",
     language: "Language",
@@ -194,6 +213,8 @@ const en: Record<UiKey, string> = {
     dashTopSymbolsTitle: "Top Symbols",
     dashTopSymbolsHint: "Largest functions and objects by size.",
     dashTopSymbolsEmpty: "Run analysis to populate symbols.",
+    dashInputTitle: "Analysis Inputs",
+    dashInputHint: "Currently selected firmware and map files.",
     symbolsSearchPlaceholder: "Search symbol name or regex",
     symbolsSectionPlaceholder: "Section",
     symbolsTypePlaceholder: "Type",
