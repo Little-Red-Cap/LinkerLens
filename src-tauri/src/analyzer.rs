@@ -2,8 +2,14 @@ use serde::{Deserialize, Serialize};
 use std::fs;
 use std::io::BufRead;
 use std::process::Command;
+use std::sync::Mutex;
 
 use crate::toolchain::{resolve_toolchain, ToolchainConfig, ToolchainPaths};
+
+#[derive(Default)]
+pub struct AppState {
+    pub symbols: Mutex<Vec<SymbolInfo>>,
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AnalyzeParams {
@@ -96,7 +102,10 @@ pub struct Finding {
     pub items: Vec<String>,
 }
 #[tauri::command]
-pub fn analyze_firmware(params: AnalyzeParams) -> Result<AnalysisResult, String> {
+pub fn analyze_firmware(
+    state: tauri::State<'_, AppState>,
+    params: AnalyzeParams,
+) -> Result<AnalysisResult, String> {
     validate_inputs(&params)?;
     let toolchain_paths = resolve_toolchain(params.toolchain.as_ref())?;
 
@@ -122,6 +131,9 @@ pub fn analyze_firmware(params: AnalyzeParams) -> Result<AnalysisResult, String>
     let totals = apply_region_totals(totals, &memory_regions);
     let strings_count = count_strings_lines(&toolchain_paths.strings_path, &params.elf_path).ok();
     let findings = compute_findings(&mut all_symbols, &sections, strings_count);
+    if let Ok(mut stored) = state.symbols.lock() {
+        *stored = all_symbols.clone();
+    }
 
     Ok(AnalysisResult {
         meta: AnalysisMeta {
@@ -141,6 +153,70 @@ pub fn analyze_firmware(params: AnalyzeParams) -> Result<AnalysisResult, String>
         },
         sections,
     })
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SymbolQuery {
+    pub query: Option<String>,
+    pub page: usize,
+    pub page_size: usize,
+    pub sort: Option<String>,
+    pub order: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PagedSymbols {
+    pub total: usize,
+    pub items: Vec<SymbolInfo>,
+}
+
+#[tauri::command]
+pub fn list_symbols(state: tauri::State<'_, AppState>, query: SymbolQuery) -> Result<PagedSymbols, String> {
+    let data = state.symbols.lock().map_err(|_| "Failed to read symbols cache.".to_string())?;
+    if data.is_empty() {
+        return Ok(PagedSymbols {
+            total: 0,
+            items: Vec::new(),
+        });
+    }
+
+    let mut items: Vec<SymbolInfo> = data
+        .iter()
+        .filter(|symbol| match query.query.as_ref() {
+            Some(q) if !q.trim().is_empty() => {
+                let needle = q.trim().to_ascii_lowercase();
+                symbol.name.to_ascii_lowercase().contains(&needle)
+            }
+            _ => true,
+        })
+        .cloned()
+        .collect();
+
+    let order = query.order.as_deref().unwrap_or("desc");
+    match query.sort.as_deref() {
+        Some("name") => {
+            items.sort_by(|a, b| a.name.cmp(&b.name));
+        }
+        _ => {
+            items.sort_by(|a, b| a.size.cmp(&b.size));
+        }
+    }
+    if order == "desc" {
+        items.reverse();
+    }
+
+    let page = query.page.max(1);
+    let page_size = query.page_size.max(1);
+    let start = (page - 1) * page_size;
+    let end = start + page_size;
+    let total = items.len();
+    let paged = if start >= total {
+        Vec::new()
+    } else {
+        items[start..end.min(total)].to_vec()
+    };
+
+    Ok(PagedSymbols { total, items: paged })
 }
 
 fn validate_inputs(params: &AnalyzeParams) -> Result<(), String> {

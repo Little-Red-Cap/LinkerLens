@@ -11,6 +11,7 @@ mod toolchain;
 fn main() {
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
+        .manage(analyzer::AppState::default())
         .invoke_handler(tauri::generate_handler![
             settings::save_settings,
             settings::save_text_file,
@@ -19,7 +20,8 @@ fn main() {
             font_pipeline::export_font,
             system_fonts::list_system_fonts,
             toolchain::detect_toolchain,
-            analyzer::analyze_firmware
+            analyzer::analyze_firmware,
+            analyzer::list_symbols
         ])
         .run(tauri::generate_context!())
         .expect("Failed to run Tauri application");
