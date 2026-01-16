@@ -32,6 +32,7 @@ pub struct AnalysisSummary {
     pub top_objects: Vec<ObjectContribution>,
     pub top_libraries: Vec<ObjectContribution>,
     pub top_sections: Vec<ObjectContribution>,
+    pub map_tree: Vec<TreeNode>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
@@ -67,6 +68,12 @@ pub struct ObjectContribution {
     pub size: u64,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TreeNode {
+    pub name: String,
+    pub size: u64,
+    pub children: Vec<TreeNode>,
+}
 #[tauri::command]
 pub fn analyze_firmware(params: AnalyzeParams) -> Result<AnalysisResult, String> {
     validate_inputs(&params)?;
@@ -84,10 +91,10 @@ pub fn analyze_firmware(params: AnalyzeParams) -> Result<AnalysisResult, String>
     symbols.truncate(50);
 
     let totals = compute_section_totals(&sections);
-    let (top_objects, top_libraries, top_sections) = if let Some(map_path) = params.map_path.as_ref() {
+    let (top_objects, top_libraries, top_sections, map_tree) = if let Some(map_path) = params.map_path.as_ref() {
         parse_map_contributions(map_path)?
     } else {
-        (Vec::new(), Vec::new(), Vec::new())
+        (Vec::new(), Vec::new(), Vec::new(), Vec::new())
     };
 
     Ok(AnalysisResult {
@@ -102,6 +109,7 @@ pub fn analyze_firmware(params: AnalyzeParams) -> Result<AnalysisResult, String>
             top_objects,
             top_libraries,
             top_sections,
+            map_tree,
         },
         sections,
     })
@@ -223,12 +231,14 @@ fn guess_section(kind: &str) -> String {
 
 fn parse_map_contributions(
     map_path: &str,
-) -> Result<(Vec<ObjectContribution>, Vec<ObjectContribution>, Vec<ObjectContribution>), String> {
+) -> Result<(Vec<ObjectContribution>, Vec<ObjectContribution>, Vec<ObjectContribution>, Vec<TreeNode>), String> {
     let contents =
         fs::read_to_string(map_path).map_err(|e| format!("Failed to read MAP file {}: {}", map_path, e))?;
     let mut objects: std::collections::HashMap<String, u64> = std::collections::HashMap::new();
     let mut libraries: std::collections::HashMap<String, u64> = std::collections::HashMap::new();
     let mut sections: std::collections::HashMap<String, u64> = std::collections::HashMap::new();
+    let mut tree: std::collections::HashMap<String, std::collections::HashMap<String, u64>> =
+        std::collections::HashMap::new();
 
     for line in contents.lines() {
         let trimmed = line.trim_start();
@@ -260,14 +270,21 @@ fn parse_map_contributions(
 
             let section_entry = sections.entry((*section_name).to_string()).or_insert(0);
             *section_entry += size;
+
+            let (library_name, object_name) = split_library_object(file);
+            let library_label = library_name.unwrap_or_else(|| "Objects".to_string());
+            let lib_entry = tree.entry(library_label).or_default();
+            let obj_entry = lib_entry.entry(object_name).or_insert(0);
+            *obj_entry += size;
         }
     }
 
     let top_objects = top_contributions(objects, 20);
     let top_libraries = top_contributions(libraries, 12);
     let top_sections = top_contributions(sections, 8);
+    let map_tree = build_tree(tree, 20, 40);
 
-    Ok((top_objects, top_libraries, top_sections))
+    Ok((top_objects, top_libraries, top_sections, map_tree))
 }
 
 fn top_contributions(map: std::collections::HashMap<String, u64>, limit: usize) -> Vec<ObjectContribution> {
@@ -301,4 +318,60 @@ fn extract_library_name(path: &str) -> Option<String> {
         return Some(name.to_string());
     }
     None
+}
+
+fn split_library_object(path: &str) -> (Option<String>, String) {
+    if let Some(start) = path.find('(') {
+        if let Some(end) = path[start + 1..].find(')') {
+            let lib_path = &path[..start];
+            let obj_name = &path[start + 1..start + 1 + end];
+            let lib_name = lib_path
+                .split(|c| c == '/' || c == '\\')
+                .last()
+                .unwrap_or(lib_path)
+                .to_string();
+            return (Some(lib_name), obj_name.to_string());
+        }
+    }
+    let base = path
+        .split(|c| c == '/' || c == '\\')
+        .last()
+        .unwrap_or(path)
+        .to_string();
+    (None, base)
+}
+
+fn build_tree(
+    tree: std::collections::HashMap<String, std::collections::HashMap<String, u64>>,
+    lib_limit: usize,
+    obj_limit: usize,
+) -> Vec<TreeNode> {
+    let mut libs: Vec<TreeNode> = tree
+        .into_iter()
+        .map(|(lib, objects)| {
+            let mut children: Vec<TreeNode> = objects
+                .into_iter()
+                .map(|(name, size)| TreeNode {
+                    name,
+                    size,
+                    children: Vec::new(),
+                })
+                .collect();
+            children.sort_by(|a, b| b.size.cmp(&a.size));
+            if children.len() > obj_limit {
+                children.truncate(obj_limit);
+            }
+            let size = children.iter().map(|child| child.size).sum();
+            TreeNode {
+                name: lib,
+                size,
+                children,
+            }
+        })
+        .collect();
+    libs.sort_by(|a, b| b.size.cmp(&a.size));
+    if libs.len() > lib_limit {
+        libs.truncate(lib_limit);
+    }
+    libs
 }

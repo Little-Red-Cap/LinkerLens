@@ -80,6 +80,7 @@ export type UiKey =
     | "objectsMapTitle"
     | "objectsMapHint"
     | "objectsMapEmpty"
+    | "objectsMapBack"
     | "objectsTopTitle"
     | "objectsTopHint"
     | "objectsTopEmpty"
@@ -180,6 +181,7 @@ const zh: Record<UiKey, string> = {
     objectsMapTitle: "贡献树图",
     objectsMapHint: "Treemap 展示库、对象文件与段的层级关系。",
     objectsMapEmpty: "MAP 解析后显示 Treemap。",
+    objectsMapBack: "返回上一级",
     objectsTopTitle: "对象贡献 Top",
     objectsTopHint: "按对象文件聚合的体积排行。",
     objectsTopEmpty: "暂无对象贡献数据",
@@ -281,6 +283,7 @@ const en: Record<UiKey, string> = {
     objectsMapTitle: "Contribution Map",
     objectsMapHint: "Treemap view of libraries, object files, and sections.",
     objectsMapEmpty: "Treemap will appear after MAP parsing.",
+    objectsMapBack: "Back",
     objectsTopTitle: "Top Objects",
     objectsTopHint: "Aggregated size by object file.",
     objectsTopEmpty: "No object data yet",

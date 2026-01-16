@@ -28,12 +28,19 @@ type ObjectContribution = {
     size: number;
 };
 
+type TreeNode = {
+    name: string;
+    size: number;
+    children: TreeNode[];
+};
+
 type AnalysisSummary = {
     sections_totals: SectionTotals;
     top_symbols: SymbolInfo[];
     top_objects: ObjectContribution[];
     top_libraries: ObjectContribution[];
     top_sections: ObjectContribution[];
+    map_tree: TreeNode[];
 };
 
 type AnalysisResult = {

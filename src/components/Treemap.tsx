@@ -56,7 +56,17 @@ const sliceLayout = (items: TreemapItem[], width: number, height: number): Rect[
     });
 };
 
-export default function Treemap({ items, width, height }: { items: TreemapItem[]; width: number; height: number }) {
+export default function Treemap({
+    items,
+    width,
+    height,
+    onSelect,
+}: {
+    items: TreemapItem[];
+    width: number;
+    height: number;
+    onSelect?: (item: TreemapItem) => void;
+}) {
     const rects = useMemo(() => sliceLayout(items, width, height), [items, width, height]);
 
     return (
@@ -75,6 +85,8 @@ export default function Treemap({ items, width, height }: { items: TreemapItem[]
                             fill={color}
                             opacity={0.85}
                             rx={6}
+                            className={onSelect ? "treemapRect isInteractive" : "treemapRect"}
+                            onClick={() => onSelect?.({ name: rect.name, value: rect.value })}
                         />
                         <title>{`${rect.name} (${rect.value})`}</title>
                         {showLabel ? (

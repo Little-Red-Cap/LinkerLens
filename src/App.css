@@ -210,6 +210,19 @@
   height: auto;
 }
 
+.treemapHeader {
+  width: 100%;
+}
+
+.treemapRect.isInteractive {
+  cursor: pointer;
+  transition: opacity 160ms ease;
+}
+
+.treemapRect.isInteractive:hover {
+  opacity: 0.95;
+}
+
 .progressStack {
   width: 100%;
 }
