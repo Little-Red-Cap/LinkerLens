@@ -40,7 +40,7 @@ type MemoryRegion = {
     name: string;
     origin: string;
     length: number;
-    used: number;
+    used?: number | null;
 };
 
 type Finding = {

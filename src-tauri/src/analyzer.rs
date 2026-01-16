@@ -94,7 +94,7 @@ pub struct MemoryRegion {
     pub name: String,
     pub origin: String,
     pub length: u64,
-    pub used: u64,
+    pub used: Option<u64>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -534,6 +534,7 @@ fn parse_memory_regions(contents: &str) -> Vec<MemoryRegion> {
     let mut regions = Vec::new();
     let mut in_section = false;
     let mut header_seen = false;
+    let mut has_used = false;
 
     for line in contents.lines() {
         let trimmed = line.trim();
@@ -543,6 +544,7 @@ fn parse_memory_regions(contents: &str) -> Vec<MemoryRegion> {
         }
         if in_section && trimmed.starts_with("Name") {
             header_seen = true;
+            has_used = trimmed.to_ascii_lowercase().contains("used");
             continue;
         }
         if in_section && header_seen {
@@ -556,7 +558,10 @@ fn parse_memory_regions(contents: &str) -> Vec<MemoryRegion> {
             let name = parts[0].to_string();
             let origin = parts[1].to_string();
             let length = parse_hex_or_dec(parts[2]);
-            let used = find_used_value(&parts).unwrap_or(0);
+            let used = if has_used { find_used_value(&parts) } else { None };
+            if name.to_ascii_lowercase() == "default" && used.unwrap_or(0) == 0 {
+                continue;
+            }
             regions.push(MemoryRegion {
                 name,
                 origin,
@@ -592,12 +597,16 @@ fn apply_region_totals(mut totals: SectionTotals, regions: &[MemoryRegion]) -> S
     let mut flash_used = None;
     let mut ram_used = None;
     for region in regions {
+        let used = match region.used {
+            Some(value) => value,
+            None => continue,
+        };
         let name = region.name.to_ascii_lowercase();
         if name.contains("flash") || name.contains("rom") {
-            flash_used = Some(flash_used.unwrap_or(0) + region.used);
+            flash_used = Some(flash_used.unwrap_or(0) + used);
         }
         if name.contains("ram") || name.contains("sram") {
-            ram_used = Some(ram_used.unwrap_or(0) + region.used);
+            ram_used = Some(ram_used.unwrap_or(0) + used);
         }
     }
     totals.flash_region_bytes = flash_used;
@@ -705,7 +714,7 @@ fn count_strings_lines(program: &str, elf_path: &str) -> Result<u64, String> {
 }
 
 fn build_cache_key(toolchain: &ToolchainPaths, params: &AnalyzeParams) -> Result<String, String> {
-    let cache_version = "v2";
+    let cache_version = "v3";
     let elf_hash = hash_file(&params.elf_path)?;
     let map_hash = match params.map_path.as_ref().map(|p| p.trim()).filter(|p| !p.is_empty()) {
         Some(path) => hash_file(path)?,

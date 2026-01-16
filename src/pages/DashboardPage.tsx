@@ -1,4 +1,4 @@
-﻿import { Card, Col, Divider, Empty, Progress, Row, Space, Statistic, Table, Tag, Typography } from "antd";
+﻿import { Card, Col, Divider, Empty, Progress, Row, Space, Table, Tag, Typography } from "antd";
 import { uiText } from "../domain/uiI18n";
 import { useAnalysisStore } from "../store/analysis.store";
 import { useUiStore } from "../store/ui.store";
@@ -36,39 +36,10 @@ export default function DashboardPage() {
     const regions = result?.summary.memory_regions ?? [];
     const cacheHit = result?.meta.cache?.hit ?? false;
 
-    const flashValue = totals?.flash_region_bytes ?? totals?.flash_bytes ?? null;
-    const ramValue = totals?.ram_region_bytes ?? totals?.ram_bytes ?? null;
     const flashBase = totals?.flash_region_bytes ?? totals?.flash_bytes ?? 0;
     const ramBase = totals?.ram_region_bytes ?? totals?.ram_bytes ?? 0;
-    const flashSource = totals?.flash_region_bytes != null
-        ? uiText(language, "analysisSourceMap")
-        : uiText(language, "analysisSourceEstimate");
-    const ramSource = totals?.ram_region_bytes != null
-        ? uiText(language, "analysisSourceMap")
-        : uiText(language, "analysisSourceEstimate");
-
-    const summaryStats = [
-        {
-            label: uiText(language, "dashFlashUsed"),
-            value: formatBytes(flashValue),
-            hint: totals ? flashSource : uiText(language, "dashAwaiting"),
-        },
-        {
-            label: uiText(language, "dashRamUsed"),
-            value: formatBytes(ramValue),
-            hint: totals ? ramSource : uiText(language, "dashAwaiting"),
-        },
-        {
-            label: uiText(language, "dashBss"),
-            value: formatBytes(totals?.bss_bytes ?? null),
-            hint: totals ? "" : uiText(language, "dashNoData"),
-        },
-        {
-            label: uiText(language, "dashData"),
-            value: formatBytes(totals?.data_bytes ?? null),
-            hint: totals ? "" : uiText(language, "dashNoData"),
-        },
-    ];
+    const estimatedFlashUsed = totals?.flash_bytes ?? 0;
+    const estimatedRamUsed = totals?.ram_bytes ?? 0;
 
     const statusLabel = (() => {
         switch (status) {
@@ -100,6 +71,13 @@ export default function DashboardPage() {
         { title: uiText(language, "symbolsColumnSection"), dataIndex: "section_guess", key: "section", width: 120 },
     ];
 
+    const estimateRegionUsed = (name: string) => {
+        const lower = String(name || "").toLowerCase();
+        if (lower.includes("flash") || lower.includes("rom")) return estimatedFlashUsed;
+        if (lower.includes("ram") || lower.includes("sram")) return estimatedRamUsed;
+        return 0;
+    };
+
     const regionColumns = [
         { title: uiText(language, "dashRegionName"), dataIndex: "name", key: "name" },
         { title: uiText(language, "dashRegionOrigin"), dataIndex: "origin", key: "origin" },
@@ -112,19 +90,27 @@ export default function DashboardPage() {
         {
             title: uiText(language, "dashRegionUsed"),
             key: "used",
-            render: (_: unknown, record: { used: number; length: number }) => {
-                const percent = record.length > 0 ? Math.min(100, (record.used / record.length) * 100) : 0;
-                const over = record.used > record.length;
+            render: (_: unknown, record: { used?: number | null; length: number; name: string }) => {
+                const usedValue = record.used ?? estimateRegionUsed(record.name);
+                if (!usedValue) {
+                    return (
+                        <Typography.Text type="secondary">
+                            -- / {formatBytes(record.length)}
+                        </Typography.Text>
+                    );
+                }
+                const percent = record.length > 0 ? Math.min(100, (usedValue / record.length) * 100) : 0;
+                const over = usedValue > record.length;
                 return (
                     <Space direction="vertical" size={4}>
                         <Progress
-                            percent={percent}
+                            percent={Number(percent.toFixed(1))}
                             size="small"
                             status={over ? "exception" : "normal"}
-                            showInfo={false}
+                            showInfo
                         />
                         <Typography.Text type={over ? "danger" : "secondary"}>
-                            {formatBytes(record.used)} / {formatBytes(record.length)}
+                            {formatBytes(usedValue)} / {formatBytes(record.length)}
                         </Typography.Text>
                     </Space>
                 );
@@ -134,21 +120,6 @@ export default function DashboardPage() {
 
     return (
         <Space direction="vertical" size="large" className="pageStack">
-            <Row gutter={[16, 16]}>
-                {summaryStats.map((stat, index) => (
-                    <Col xs={24} sm={12} lg={6} key={stat.label}>
-                        <Card className="pageCard riseIn" style={{ animationDelay: `${index * 80}ms` }}>
-                            <Statistic title={stat.label} value={stat.value} />
-                            {stat.hint ? (
-                                <Typography.Text type="secondary" className="cardHint">
-                                    {stat.hint}
-                                </Typography.Text>
-                            ) : null}
-                        </Card>
-                    </Col>
-                ))}
-            </Row>
-
             <Row gutter={[16, 16]}>
                 <Col xs={24} lg={12}>
                     <Card className="pageCard riseIn" style={{ animationDelay: "120ms" }}>
@@ -199,6 +170,19 @@ export default function DashboardPage() {
                 </Col>
             </Row>
 
+            <Card className="pageCard riseIn" style={{ animationDelay: "260ms" }}>
+                <Typography.Title level={4}>{uiText(language, "dashRegionsTitle")}</Typography.Title>
+                <Typography.Text type="secondary">{uiText(language, "dashRegionsHint")}</Typography.Text>
+                <Divider />
+                <Table
+                    columns={regionColumns}
+                    dataSource={regions}
+                    rowKey={(row) => row.name}
+                    pagination={false}
+                    locale={{ emptyText: <Empty description={uiText(language, "objectsMapEmpty")} /> }}
+                />
+            </Card>
+
             <Row gutter={[16, 16]}>
                 <Col xs={24} lg={14}>
                     <Card className="pageCard riseIn" style={{ animationDelay: "180ms" }}>
@@ -213,29 +197,37 @@ export default function DashboardPage() {
                             <div className="progressRow">
                                 <span>.text {formatBytes(totals?.text_bytes ?? null)}</span>
                                 <Progress
-                                    percent={totals?.text_bytes ? (totals.text_bytes / (flashBase || 1)) * 100 : 0}
-                                    showInfo={false}
+                                    percent={
+                                        totals?.text_bytes ? Number(((totals.text_bytes / (flashBase || 1)) * 100).toFixed(1)) : 0
+                                    }
+                                    showInfo
                                 />
                             </div>
                             <div className="progressRow">
                                 <span>.rodata {formatBytes(totals?.rodata_bytes ?? null)}</span>
                                 <Progress
-                                    percent={totals?.rodata_bytes ? (totals.rodata_bytes / (flashBase || 1)) * 100 : 0}
-                                    showInfo={false}
+                                    percent={
+                                        totals?.rodata_bytes ? Number(((totals.rodata_bytes / (flashBase || 1)) * 100).toFixed(1)) : 0
+                                    }
+                                    showInfo
                                 />
                             </div>
                             <div className="progressRow">
                                 <span>.data {formatBytes(totals?.data_bytes ?? null)}</span>
                                 <Progress
-                                    percent={totals?.data_bytes ? (totals.data_bytes / (flashBase || 1)) * 100 : 0}
-                                    showInfo={false}
+                                    percent={
+                                        totals?.data_bytes ? Number(((totals.data_bytes / (flashBase || 1)) * 100).toFixed(1)) : 0
+                                    }
+                                    showInfo
                                 />
                             </div>
                             <div className="progressRow">
                                 <span>.bss {formatBytes(totals?.bss_bytes ?? null)}</span>
                                 <Progress
-                                    percent={totals?.bss_bytes ? (totals.bss_bytes / (ramBase || 1)) * 100 : 0}
-                                    showInfo={false}
+                                    percent={
+                                        totals?.bss_bytes ? Number(((totals.bss_bytes / (ramBase || 1)) * 100).toFixed(1)) : 0
+                                    }
+                                    showInfo
                                 />
                             </div>
                         </Space>
@@ -256,19 +248,7 @@ export default function DashboardPage() {
                     </Card>
                 </Col>
             </Row>
-
-            <Card className="pageCard riseIn" style={{ animationDelay: "260ms" }}>
-                <Typography.Title level={4}>{uiText(language, "dashRegionsTitle")}</Typography.Title>
-                <Typography.Text type="secondary">{uiText(language, "dashRegionsHint")}</Typography.Text>
-                <Divider />
-                <Table
-                    columns={regionColumns}
-                    dataSource={regions}
-                    rowKey={(row) => row.name}
-                    pagination={false}
-                    locale={{ emptyText: <Empty description={uiText(language, "objectsMapEmpty")} /> }}
-                />
-            </Card>
         </Space>
     );
 }
+
