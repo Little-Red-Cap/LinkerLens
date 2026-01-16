@@ -3,6 +3,7 @@ import { open } from "@tauri-apps/plugin-dialog";
 import { invoke } from "@tauri-apps/api/core";
 import { useCallback, useEffect } from "react";
 import { uiText } from "../domain/uiI18n";
+import { useAnalysisStore } from "../store/analysis.store";
 import { useSettingsStore } from "../store/settings.store";
 import { useUiStore } from "../store/ui.store";
 
@@ -27,11 +28,26 @@ const deriveRootFromNm = (nmPath: string) => {
     return "";
 };
 
+const statusLabel = (language: string, status: string) => {
+    switch (status) {
+        case "running":
+            return uiText(language as any, "analysisStatusRunning");
+        case "success":
+            return uiText(language as any, "analysisStatusSuccess");
+        case "error":
+            return uiText(language as any, "analysisStatusError");
+        default:
+            return uiText(language as any, "analysisStatusIdle");
+    }
+};
+
 export default function SettingsPage() {
     const [form] = Form.useForm();
     const toolchain = useSettingsStore((s) => s.toolchain);
     const updateToolchain = useSettingsStore((s) => s.updateToolchain);
     const resetToolchain = useSettingsStore((s) => s.resetToolchain);
+    const analysisStatus = useAnalysisStore((s) => s.status);
+    const analysisError = useAnalysisStore((s) => s.lastError);
     const themeMode = useUiStore((s) => s.theme);
     const language = useUiStore((s) => s.language);
     const setTheme = useUiStore((s) => s.setTheme);
@@ -150,6 +166,14 @@ export default function SettingsPage() {
                                 <Button onClick={detectToolchain}>{uiText(language, "settingsDetect")}</Button>
                                 <Button onClick={resetToolchain}>{uiText(language, "settingsReset")}</Button>
                             </Space>
+                        </Col>
+                        <Col xs={24}>
+                            <Typography.Text type="secondary">
+                                {uiText(language, "analysisStatusDetail", { status: statusLabel(language, analysisStatus) })}
+                            </Typography.Text>
+                            {analysisStatus === "error" && analysisError ? (
+                                <Typography.Text className="errorText">{analysisError}</Typography.Text>
+                            ) : null}
                         </Col>
                     </Row>
                 </Form>

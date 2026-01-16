@@ -29,6 +29,7 @@ pub struct AnalysisMeta {
 pub struct AnalysisSummary {
     pub sections_totals: SectionTotals,
     pub top_symbols: Vec<SymbolInfo>,
+    pub top_objects: Vec<ObjectContribution>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
@@ -58,6 +59,12 @@ pub struct SymbolInfo {
     pub section_guess: String,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ObjectContribution {
+    pub name: String,
+    pub size: u64,
+}
+
 #[tauri::command]
 pub fn analyze_firmware(params: AnalyzeParams) -> Result<AnalysisResult, String> {
     validate_inputs(&params)?;
@@ -75,6 +82,11 @@ pub fn analyze_firmware(params: AnalyzeParams) -> Result<AnalysisResult, String>
     symbols.truncate(50);
 
     let totals = compute_section_totals(&sections);
+    let top_objects = if let Some(map_path) = params.map_path.as_ref() {
+        parse_map_objects(map_path)?
+    } else {
+        Vec::new()
+    };
 
     Ok(AnalysisResult {
         meta: AnalysisMeta {
@@ -85,6 +97,7 @@ pub fn analyze_firmware(params: AnalyzeParams) -> Result<AnalysisResult, String>
         summary: AnalysisSummary {
             sections_totals: totals,
             top_symbols: symbols,
+            top_objects,
         },
         sections,
     })
@@ -99,6 +112,16 @@ fn validate_inputs(params: &AnalyzeParams) -> Result<(), String> {
         .map_err(|e| format!("Failed to read ELF file {}: {}", elf_path, e))?;
     if !metadata.is_file() {
         return Err("ELF path must point to a file.".to_string());
+    }
+    if let Some(map_path) = params.map_path.as_ref() {
+        let map_path = map_path.trim();
+        if !map_path.is_empty() {
+            let metadata = fs::metadata(map_path)
+                .map_err(|e| format!("Failed to read MAP file {}: {}", map_path, e))?;
+            if !metadata.is_file() {
+                return Err("MAP path must point to a file.".to_string());
+            }
+        }
     }
     Ok(())
 }
@@ -192,4 +215,44 @@ fn guess_section(kind: &str) -> String {
         _ => "other",
     }
     .to_string()
+}
+
+fn parse_map_objects(map_path: &str) -> Result<Vec<ObjectContribution>, String> {
+    let contents =
+        fs::read_to_string(map_path).map_err(|e| format!("Failed to read MAP file {}: {}", map_path, e))?;
+    let mut totals: std::collections::HashMap<String, u64> = std::collections::HashMap::new();
+
+    for line in contents.lines() {
+        let trimmed = line.trim_start();
+        if trimmed.starts_with(".") {
+            let parts: Vec<&str> = trimmed.split_whitespace().collect();
+            if parts.len() < 4 {
+                continue;
+            }
+            let size_hex = parts.get(2).unwrap_or(&"");
+            let size = u64::from_str_radix(size_hex.trim_start_matches("0x"), 16).unwrap_or(0);
+            if size == 0 {
+                continue;
+            }
+            let file = parts.last().unwrap_or(&"");
+            if file.starts_with('*') || file == &"*fill*" || file == &"*(COMMON)" {
+                continue;
+            }
+            if !file.contains(".o") && !file.contains(".a") {
+                continue;
+            }
+            let entry = totals.entry((*file).to_string()).or_insert(0);
+            *entry += size;
+        }
+    }
+
+    let mut result: Vec<ObjectContribution> = totals
+        .into_iter()
+        .map(|(name, size)| ObjectContribution { name, size })
+        .collect();
+    result.sort_by(|a, b| b.size.cmp(&a.size));
+    if result.len() > 20 {
+        result.truncate(20);
+    }
+    Ok(result)
 }

@@ -1,4 +1,4 @@
-﻿import { Card, Col, Divider, Empty, Progress, Row, Space, Statistic, Table, Typography } from "antd";
+﻿import { Card, Col, Divider, Empty, Progress, Row, Space, Statistic, Table, Tag, Typography } from "antd";
 import { uiText } from "../domain/uiI18n";
 import { useAnalysisStore } from "../store/analysis.store";
 import { useUiStore } from "../store/ui.store";
@@ -12,10 +12,25 @@ const formatBytes = (value?: number) => {
     return `${mb.toFixed(2)} MB`;
 };
 
+const statusColor = (status: string) => {
+    switch (status) {
+        case "running":
+            return "blue";
+        case "success":
+            return "green";
+        case "error":
+            return "red";
+        default:
+            return "default";
+    }
+};
+
 export default function DashboardPage() {
     const language = useUiStore((s) => s.language);
     const inputs = useAnalysisStore((s) => s.inputs);
     const result = useAnalysisStore((s) => s.result);
+    const status = useAnalysisStore((s) => s.status);
+    const lastError = useAnalysisStore((s) => s.lastError);
     const totals = result?.summary.sections_totals;
     const symbols = result?.summary.top_symbols ?? [];
 
@@ -42,6 +57,19 @@ export default function DashboardPage() {
         },
     ];
 
+    const statusLabel = (() => {
+        switch (status) {
+            case "running":
+                return uiText(language, "analysisStatusRunning");
+            case "success":
+                return uiText(language, "analysisStatusSuccess");
+            case "error":
+                return uiText(language, "analysisStatusError");
+            default:
+                return uiText(language, "analysisStatusIdle");
+        }
+    })();
+
     const topSymbolColumns = [
         { title: uiText(language, "symbolsColumnSymbol"), dataIndex: "name", key: "name" },
         { title: uiText(language, "symbolsColumnSize"), dataIndex: "size", key: "size" },
@@ -65,25 +93,50 @@ export default function DashboardPage() {
                 ))}
             </Row>
 
-            <Card className="pageCard riseIn" style={{ animationDelay: "120ms" }}>
-                <Typography.Title level={4}>{uiText(language, "dashInputTitle")}</Typography.Title>
-                <Typography.Text type="secondary">{uiText(language, "dashInputHint")}</Typography.Text>
-                <Divider />
-                <Space direction="vertical" size="small" className="pathList">
-                    <div className="pathRow">
-                        <Typography.Text strong>{uiText(language, "analysisElfLabel")}</Typography.Text>
-                        <Typography.Text className="pathValue">
-                            {inputs.elfPath || uiText(language, "analysisNotSet")}
+            <Row gutter={[16, 16]}>
+                <Col xs={24} lg={12}>
+                    <Card className="pageCard riseIn" style={{ animationDelay: "120ms" }}>
+                        <Typography.Title level={4}>{uiText(language, "dashInputTitle")}</Typography.Title>
+                        <Typography.Text type="secondary">{uiText(language, "dashInputHint")}</Typography.Text>
+                        <Divider />
+                        <Space direction="vertical" size="small" className="pathList">
+                            <div className="pathRow">
+                                <Typography.Text strong>{uiText(language, "analysisElfLabel")}</Typography.Text>
+                                <Typography.Text className="pathValue">
+                                    {inputs.elfPath || uiText(language, "analysisNotSet")}
+                                </Typography.Text>
+                            </div>
+                            <div className="pathRow">
+                                <Typography.Text strong>{uiText(language, "analysisMapLabel")}</Typography.Text>
+                                <Typography.Text className="pathValue">
+                                    {inputs.mapPath || uiText(language, "analysisNotSet")}
+                                </Typography.Text>
+                            </div>
+                        </Space>
+                    </Card>
+                </Col>
+                <Col xs={24} lg={12}>
+                    <Card className="pageCard riseIn" style={{ animationDelay: "140ms" }}>
+                        <Typography.Title level={4}>{uiText(language, "analysisStatusTitle")}</Typography.Title>
+                        <Typography.Text type="secondary">
+                            {uiText(language, "analysisStatusDetail", { status: statusLabel })}
                         </Typography.Text>
-                    </div>
-                    <div className="pathRow">
-                        <Typography.Text strong>{uiText(language, "analysisMapLabel")}</Typography.Text>
-                        <Typography.Text className="pathValue">
-                            {inputs.mapPath || uiText(language, "analysisNotSet")}
-                        </Typography.Text>
-                    </div>
-                </Space>
-            </Card>
+                        <Divider />
+                        <Space direction="vertical" size="small">
+                            <Tag color={statusColor(status)} className="statusTag">
+                                {statusLabel}
+                            </Tag>
+                            <Typography.Text type="secondary">
+                                {status === "idle"
+                                    ? uiText(language, "analysisStatusNone")
+                                    : status === "error" && lastError
+                                        ? lastError
+                                        : ""}
+                            </Typography.Text>
+                        </Space>
+                    </Card>
+                </Col>
+            </Row>
 
             <Row gutter={[16, 16]}>
                 <Col xs={24} lg={14}>

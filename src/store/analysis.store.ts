@@ -23,9 +23,15 @@ type SymbolInfo = {
     section_guess?: string;
 };
 
+type ObjectContribution = {
+    name: string;
+    size: number;
+};
+
 type AnalysisSummary = {
     sections_totals: SectionTotals;
     top_symbols: SymbolInfo[];
+    top_objects: ObjectContribution[];
 };
 
 type AnalysisResult = {

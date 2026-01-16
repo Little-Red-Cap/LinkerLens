@@ -221,6 +221,16 @@
   word-break: break-all;
 }
 
+.statusTag {
+  font-size: 12px;
+}
+
+.errorText {
+  display: block;
+  color: #d4380d;
+  font-size: 12px;
+}
+
 .listHint {
   display: block;
 }

@@ -27,6 +27,13 @@ export type UiKey =
     | "analysisMissingElf"
     | "analysisStart"
     | "analysisFailed"
+    | "analysisStatusTitle"
+    | "analysisStatusIdle"
+    | "analysisStatusRunning"
+    | "analysisStatusSuccess"
+    | "analysisStatusError"
+    | "analysisStatusNone"
+    | "analysisStatusDetail"
     | "autoDetectEnabled"
     | "manualToolchain"
     | "language"
@@ -115,6 +122,13 @@ const zh: Record<UiKey, string> = {
     analysisMissingElf: "请先选择 ELF 文件",
     analysisStart: "开始分析",
     analysisFailed: "分析失败：{msg}",
+    analysisStatusTitle: "分析状态",
+    analysisStatusIdle: "空闲",
+    analysisStatusRunning: "执行中",
+    analysisStatusSuccess: "成功",
+    analysisStatusError: "失败",
+    analysisStatusNone: "尚未运行",
+    analysisStatusDetail: "当前状态：{status}",
     autoDetectEnabled: "自动探测已开启",
     manualToolchain: "手动配置工具链",
     language: "语言",
@@ -204,6 +218,13 @@ const en: Record<UiKey, string> = {
     analysisMissingElf: "Please select an ELF file.",
     analysisStart: "Analysis started",
     analysisFailed: "Analysis failed: {msg}",
+    analysisStatusTitle: "Analysis Status",
+    analysisStatusIdle: "Idle",
+    analysisStatusRunning: "Running",
+    analysisStatusSuccess: "Success",
+    analysisStatusError: "Error",
+    analysisStatusNone: "Not run",
+    analysisStatusDetail: "Current status: {status}",
     autoDetectEnabled: "Auto-detect enabled",
     manualToolchain: "Manual toolchain",
     language: "Language",
