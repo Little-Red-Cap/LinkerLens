@@ -261,6 +261,23 @@
   font-size: 12px;
 }
 
+.findingCard {
+  min-height: 160px;
+}
+
+.findingValue {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.findingItems {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 12px;
+  color: var(--muted);
+}
 .listHint {
   display: block;
 }

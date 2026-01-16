@@ -43,6 +43,13 @@ type MemoryRegion = {
     used: number;
 };
 
+type Finding = {
+    id: string;
+    severity: string;
+    value: number;
+    items: string[];
+};
+
 type AnalysisSummary = {
     sections_totals: SectionTotals;
     top_symbols: SymbolInfo[];
@@ -51,6 +58,7 @@ type AnalysisSummary = {
     top_sections: ObjectContribution[];
     map_tree: TreeNode[];
     memory_regions: MemoryRegion[];
+    findings: Finding[];
 };
 
 type AnalysisResult = {

@@ -98,6 +98,12 @@ export type UiKey =
     | "objectsSectionsHint"
     | "objectsZeroSymbols"
     | "findingsStatusNotRun"
+    | "findingsStatusClear"
+    | "findingsSeverityWarn"
+    | "findingsSeverityInfo"
+    | "findingsValue"
+    | "findingsItems"
+    | "findingsCount"
     | "findingsRuleSizeTitle"
     | "findingsRuleSizeDetail"
     | "findingsRuleRamTitle"
@@ -207,6 +213,12 @@ const zh: Record<UiKey, string> = {
     objectsSectionsHint: "按段名称聚合的体积排行。",
     objectsZeroSymbols: "0 个符号",
     findingsStatusNotRun: "未运行",
+    findingsStatusClear: "未命中",
+    findingsSeverityWarn: "警告",
+    findingsSeverityInfo: "提示",
+    findingsValue: "体积",
+    findingsItems: "命中项",
+    findingsCount: "数量",
     findingsRuleSizeTitle: "固件体积过大",
     findingsRuleSizeDetail: "统计 .text + .rodata + .data",
     findingsRuleRamTitle: "RAM 压力",
@@ -317,6 +329,12 @@ const en: Record<UiKey, string> = {
     objectsSectionsHint: "Aggregated size by section name.",
     objectsZeroSymbols: "0 symbols",
     findingsStatusNotRun: "Not run",
+    findingsStatusClear: "Clear",
+    findingsSeverityWarn: "Warning",
+    findingsSeverityInfo: "Info",
+    findingsValue: "Size",
+    findingsItems: "Items",
+    findingsCount: "Count",
     findingsRuleSizeTitle: "Firmware too large",
     findingsRuleSizeDetail: "Checks .text + .rodata + .data",
     findingsRuleRamTitle: "RAM pressure",

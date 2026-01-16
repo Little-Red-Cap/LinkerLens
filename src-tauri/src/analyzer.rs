@@ -1,5 +1,6 @@
 use serde::{Deserialize, Serialize};
 use std::fs;
+use std::io::BufRead;
 use std::process::Command;
 
 use crate::toolchain::{resolve_toolchain, ToolchainConfig, ToolchainPaths};
@@ -34,6 +35,7 @@ pub struct AnalysisSummary {
     pub top_sections: Vec<ObjectContribution>,
     pub map_tree: Vec<TreeNode>,
     pub memory_regions: Vec<MemoryRegion>,
+    pub findings: Vec<Finding>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
@@ -85,6 +87,14 @@ pub struct MemoryRegion {
     pub length: u64,
     pub used: u64,
 }
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Finding {
+    pub id: String,
+    pub severity: String,
+    pub value: u64,
+    pub items: Vec<String>,
+}
 #[tauri::command]
 pub fn analyze_firmware(params: AnalyzeParams) -> Result<AnalysisResult, String> {
     validate_inputs(&params)?;
@@ -97,7 +107,8 @@ pub fn analyze_firmware(params: AnalyzeParams) -> Result<AnalysisResult, String>
         &toolchain_paths.nm_path,
         &["-S", "--size-sort", &params.elf_path],
     )?;
-    let mut symbols = parse_nm_symbols(&nm_out);
+    let mut all_symbols = parse_nm_symbols(&nm_out);
+    let mut symbols = all_symbols.clone();
     symbols.sort_by(|a, b| b.size.cmp(&a.size));
     symbols.truncate(50);
 
@@ -109,6 +120,8 @@ pub fn analyze_firmware(params: AnalyzeParams) -> Result<AnalysisResult, String>
         (Vec::new(), Vec::new(), Vec::new(), Vec::new(), Vec::new())
     };
     let totals = apply_region_totals(totals, &memory_regions);
+    let strings_count = count_strings_lines(&toolchain_paths.strings_path, &params.elf_path).ok();
+    let findings = compute_findings(&mut all_symbols, &sections, strings_count);
 
     Ok(AnalysisResult {
         meta: AnalysisMeta {
@@ -124,6 +137,7 @@ pub fn analyze_firmware(params: AnalyzeParams) -> Result<AnalysisResult, String>
             top_sections,
             map_tree,
             memory_regions,
+            findings,
         },
         sections,
     })
@@ -466,6 +480,105 @@ fn apply_region_totals(mut totals: SectionTotals, regions: &[MemoryRegion]) -> S
     totals.flash_region_bytes = flash_used;
     totals.ram_region_bytes = ram_used;
     totals
+}
+
+fn compute_findings(
+    symbols: &mut Vec<SymbolInfo>,
+    sections: &[SectionInfo],
+    strings_count: Option<u64>,
+) -> Vec<Finding> {
+    let mut findings = Vec::new();
+    let mut ram_symbols: Vec<&SymbolInfo> = symbols
+        .iter()
+        .filter(|s| matches!(s.kind.as_str(), "B" | "b" | "D" | "d"))
+        .collect();
+    ram_symbols.sort_by(|a, b| b.size.cmp(&a.size));
+    let ram_total: u64 = ram_symbols.iter().map(|s| s.size).sum();
+    if ram_total > 0 {
+        findings.push(Finding {
+            id: "RAM_PRESSURE".to_string(),
+            severity: "warn".to_string(),
+            value: ram_total,
+            items: ram_symbols.iter().take(5).map(|s| s.name.clone()).collect(),
+        });
+    }
+
+    let mut float_symbols: Vec<&SymbolInfo> = symbols
+        .iter()
+        .filter(|s| {
+            let name = s.name.to_ascii_lowercase();
+            name.contains("float")
+                || name.contains("dtoa")
+                || name.contains("aeabi_f")
+                || name.contains("aeabi_d")
+        })
+        .collect();
+    float_symbols.sort_by(|a, b| b.size.cmp(&a.size));
+    let float_total: u64 = float_symbols.iter().map(|s| s.size).sum();
+    if float_total > 0 {
+        findings.push(Finding {
+            id: "FLOAT_BLOAT".to_string(),
+            severity: "warn".to_string(),
+            value: float_total,
+            items: float_symbols.iter().take(5).map(|s| s.name.clone()).collect(),
+        });
+    }
+
+    let exidx_total: u64 = sections
+        .iter()
+        .filter(|s| s.name.contains(".ARM.exidx") || s.name.contains(".ARM.extab"))
+        .map(|s| s.size)
+        .sum();
+    if exidx_total > 0 {
+        findings.push(Finding {
+            id: "EXIDX".to_string(),
+            severity: "info".to_string(),
+            value: exidx_total,
+            items: sections
+                .iter()
+                .filter(|s| s.name.contains(".ARM.exidx") || s.name.contains(".ARM.extab"))
+                .map(|s| s.name.clone())
+                .collect(),
+        });
+    }
+
+    if let Some(count) = strings_count {
+        if count > 0 {
+            findings.push(Finding {
+                id: "STRING_COUNT".to_string(),
+                severity: "info".to_string(),
+                value: count,
+                items: Vec::new(),
+            });
+        }
+    }
+
+    findings
+}
+
+fn count_strings_lines(program: &str, elf_path: &str) -> Result<u64, String> {
+    let mut child = std::process::Command::new(program)
+        .args([elf_path])
+        .stdout(std::process::Stdio::piped())
+        .spawn()
+        .map_err(|e| format!("Failed to run {}: {}", program, e))?;
+
+    let stdout = child
+        .stdout
+        .take()
+        .ok_or_else(|| "Failed to capture strings output.".to_string())?;
+    let mut count: u64 = 0;
+    let mut reader = std::io::BufReader::new(stdout);
+    let mut buf = Vec::with_capacity(8192);
+    while reader.read_until(b'\n', &mut buf).map_err(|e| e.to_string())? > 0 {
+        count += 1;
+        buf.clear();
+    }
+    let status = child.wait().map_err(|e| e.to_string())?;
+    if !status.success() {
+        return Err("strings command failed".to_string());
+    }
+    Ok(count)
 }
 
 fn parse_hex_or_dec(value: &str) -> u64 {
