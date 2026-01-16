@@ -1,5 +1,6 @@
 use serde::{Deserialize, Serialize};
 use std::env;
+use std::fs;
 use std::path::{Path, PathBuf};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -43,6 +44,14 @@ pub fn detect_toolchain(config: Option<ToolchainConfig>) -> Result<Vec<Toolchain
             source: "path".to_string(),
             paths,
         });
+        return Ok(results);
+    }
+
+    if let Some(paths) = resolve_from_common_paths()? {
+        results.push(ToolchainCandidate {
+            source: "common".to_string(),
+            paths,
+        });
     }
 
     Ok(results)
@@ -58,8 +67,15 @@ pub fn resolve_toolchain(config: Option<&ToolchainConfig>) -> Result<ToolchainPa
         }
     }
 
-    resolve_from_path()?
-        .ok_or_else(|| "Failed to detect arm-none-eabi toolchain on PATH.".to_string())
+    if let Some(paths) = resolve_from_path()? {
+        return Ok(paths);
+    }
+
+    if let Some(paths) = resolve_from_common_paths()? {
+        return Ok(paths);
+    }
+
+    Err("Failed to detect arm-none-eabi toolchain on PATH.".to_string())
 }
 
 fn resolve_from_config(config: &ToolchainConfig) -> Result<Option<ToolchainPaths>, String> {
@@ -118,6 +134,16 @@ fn resolve_from_path() -> Result<Option<ToolchainPaths>, String> {
     }
 }
 
+fn resolve_from_common_paths() -> Result<Option<ToolchainPaths>, String> {
+    let roots = common_roots();
+    for root in roots {
+        if let Some(paths) = find_toolchain_in_root(&root)? {
+            return Ok(Some(paths));
+        }
+    }
+    Ok(None)
+}
+
 fn guess_from_root(root: &str, tool: &str) -> String {
     let suffix = if cfg!(windows) { ".exe" } else { "" };
     let mut base = PathBuf::from(root);
@@ -143,4 +169,69 @@ fn find_in_path(tool: &str) -> Option<String> {
 
 fn path_exists(path: &str) -> bool {
     Path::new(path).exists()
+}
+
+fn common_roots() -> Vec<PathBuf> {
+    let mut roots = Vec::new();
+    if cfg!(windows) {
+        let base_roots = [
+            r"C:\Program Files\Arm GNU Toolchain",
+            r"C:\Program Files (x86)\Arm GNU Toolchain",
+            r"C:\Program Files\GNU Arm Embedded Toolchain",
+            r"C:\Program Files (x86)\GNU Arm Embedded Toolchain",
+            r"C:\Program Files\gcc-arm-none-eabi",
+            r"C:\Program Files (x86)\gcc-arm-none-eabi",
+            r"C:\ARM\gcc-arm-none-eabi",
+            r"C:\GNU Arm Embedded Toolchain",
+        ];
+        for root in base_roots {
+            roots.push(PathBuf::from(root));
+        }
+    } else {
+        let base_roots = ["/usr", "/usr/local", "/opt", "/opt/arm", "/opt/gcc-arm-none-eabi"];
+        for root in base_roots {
+            roots.push(PathBuf::from(root));
+        }
+    }
+    roots
+}
+
+fn find_toolchain_in_root(root: &Path) -> Result<Option<ToolchainPaths>, String> {
+    let tool = format!("arm-none-eabi-nm{}", if cfg!(windows) { ".exe" } else { "" });
+    if root.join("bin").join(&tool).exists() {
+        return build_paths_from_bin(&root.join("bin"));
+    }
+
+    if !root.exists() {
+        return Ok(None);
+    }
+
+    let entries = fs::read_dir(root).map_err(|e| format!("Failed to scan {}: {}", root.display(), e))?;
+    for entry in entries.flatten() {
+        let path = entry.path();
+        if !path.is_dir() {
+            continue;
+        }
+        let bin = path.join("bin");
+        if bin.join(&tool).exists() {
+            return build_paths_from_bin(&bin);
+        }
+    }
+
+    Ok(None)
+}
+
+fn build_paths_from_bin(bin_dir: &Path) -> Result<Option<ToolchainPaths>, String> {
+    let suffix = if cfg!(windows) { ".exe" } else { "" };
+    let nm = bin_dir.join(format!("arm-none-eabi-nm{}", suffix));
+    let objdump = bin_dir.join(format!("arm-none-eabi-objdump{}", suffix));
+    let strings = bin_dir.join(format!("arm-none-eabi-strings{}", suffix));
+    if nm.exists() && objdump.exists() && strings.exists() {
+        return Ok(Some(ToolchainPaths {
+            nm_path: nm.to_string_lossy().to_string(),
+            objdump_path: objdump.to_string_lossy().to_string(),
+            strings_path: strings.to_string_lossy().to_string(),
+        }));
+    }
+    Ok(None)
 }

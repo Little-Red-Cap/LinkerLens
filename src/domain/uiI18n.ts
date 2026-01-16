@@ -14,6 +14,8 @@ export type UiKey =
     | "pageSettings"
     | "toolchainReady"
     | "toolchainMissing"
+    | "toolchainDetectSuccess"
+    | "toolchainDetectFailed"
     | "newAnalysis"
     | "analysisHint"
     | "analysisSelectElfTitle"
@@ -21,6 +23,10 @@ export type UiKey =
     | "analysisElfLabel"
     | "analysisMapLabel"
     | "analysisNotSet"
+    | "analysisNeedToolchain"
+    | "analysisMissingElf"
+    | "analysisStart"
+    | "analysisFailed"
     | "autoDetectEnabled"
     | "manualToolchain"
     | "language"
@@ -36,6 +42,7 @@ export type UiKey =
     | "settingsObjdumpPath"
     | "settingsStringsPath"
     | "settingsBrowse"
+    | "settingsDetect"
     | "settingsReset"
     | "settingsUiTitle"
     | "settingsUiHint"
@@ -95,6 +102,8 @@ const zh: Record<UiKey, string> = {
     pageSettings: "设置",
     toolchainReady: "工具链已就绪",
     toolchainMissing: "工具链未配置",
+    toolchainDetectSuccess: "已自动识别工具链",
+    toolchainDetectFailed: "未能自动识别工具链",
     newAnalysis: "新建分析",
     analysisHint: "选择 ELF 和 MAP 后即可开始分析。",
     analysisSelectElfTitle: "选择固件 ELF",
@@ -102,6 +111,10 @@ const zh: Record<UiKey, string> = {
     analysisElfLabel: "ELF",
     analysisMapLabel: "MAP",
     analysisNotSet: "未选择",
+    analysisNeedToolchain: "请先配置工具链路径",
+    analysisMissingElf: "请先选择 ELF 文件",
+    analysisStart: "开始分析",
+    analysisFailed: "分析失败：{msg}",
     autoDetectEnabled: "自动探测已开启",
     manualToolchain: "手动配置工具链",
     language: "语言",
@@ -117,6 +130,7 @@ const zh: Record<UiKey, string> = {
     settingsObjdumpPath: "arm-none-eabi-objdump",
     settingsStringsPath: "arm-none-eabi-strings",
     settingsBrowse: "浏览",
+    settingsDetect: "自动探测",
     settingsReset: "重置",
     settingsUiTitle: "界面偏好",
     settingsUiHint: "默认语言为中文，可随时切换主题与语言。",
@@ -177,6 +191,8 @@ const en: Record<UiKey, string> = {
     pageSettings: "Settings",
     toolchainReady: "Toolchain Ready",
     toolchainMissing: "Toolchain Missing",
+    toolchainDetectSuccess: "Toolchain detected",
+    toolchainDetectFailed: "Toolchain not found",
     newAnalysis: "New Analysis",
     analysisHint: "Select an ELF and MAP file to start analysis.",
     analysisSelectElfTitle: "Select ELF firmware",
@@ -184,6 +200,10 @@ const en: Record<UiKey, string> = {
     analysisElfLabel: "ELF",
     analysisMapLabel: "MAP",
     analysisNotSet: "Not set",
+    analysisNeedToolchain: "Please configure the toolchain first.",
+    analysisMissingElf: "Please select an ELF file.",
+    analysisStart: "Analysis started",
+    analysisFailed: "Analysis failed: {msg}",
     autoDetectEnabled: "Auto-detect enabled",
     manualToolchain: "Manual toolchain",
     language: "Language",
@@ -199,6 +219,7 @@ const en: Record<UiKey, string> = {
     settingsObjdumpPath: "arm-none-eabi-objdump",
     settingsStringsPath: "arm-none-eabi-strings",
     settingsBrowse: "Browse",
+    settingsDetect: "Auto-detect",
     settingsReset: "Reset",
     settingsUiTitle: "UI Preferences",
     settingsUiHint: "Default language is Chinese. Switch theme or language anytime.",
@@ -247,6 +268,11 @@ const en: Record<UiKey, string> = {
 
 const dictionaries: Record<Language, Record<UiKey, string>> = { zh, en };
 
-export function uiText(language: Language, key: UiKey): string {
-    return dictionaries[language]?.[key] ?? zh[key] ?? key;
+export function uiText(language: Language, key: UiKey, vars?: Record<string, string | number>): string {
+    const template = dictionaries[language]?.[key] ?? zh[key] ?? key;
+    if (!vars) return template;
+    return template.replace(/\{(\w+)\}/g, (_, name) => {
+        const value = vars[name];
+        return value == null ? "" : String(value);
+    });
 }

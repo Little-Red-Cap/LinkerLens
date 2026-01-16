@@ -52,11 +52,33 @@ type AnalyzeParams = {
     };
 };
 
+type ToolchainCandidate = {
+    source: string;
+    paths: {
+        nm_path: string;
+        objdump_path: string;
+        strings_path: string;
+    };
+};
+
+const deriveRootFromNm = (nmPath: string) => {
+    const normalized = nmPath.replace(/\\/g, "/");
+    const parts = normalized.split("/");
+    if (parts.length < 3) return "";
+    if (parts[parts.length - 1].startsWith("arm-none-eabi-nm")) {
+        const rootParts = parts.slice(0, -2);
+        const root = rootParts.join("/");
+        return nmPath.includes("\\") ? root.replace(/\//g, "\\") : root;
+    }
+    return "";
+};
+
 export default function App() {
     const [activePage, setActivePage] = useState<PageKey>("dashboard");
     const screens = Grid.useBreakpoint();
     const isCompact = useMemo(() => !screens.md, [screens.md]);
     const toolchain = useSettingsStore((s) => s.toolchain);
+    const updateToolchain = useSettingsStore((s) => s.updateToolchain);
     const themeMode = useUiStore((s) => s.theme);
     const language = useUiStore((s) => s.language);
     const setTheme = useUiStore((s) => s.setTheme);
@@ -108,14 +130,71 @@ export default function App() {
         toolchain.toolchainRoot || toolchain.nmPath || toolchain.objdumpPath || toolchain.stringsPath,
     );
 
+    const detectToolchain = async (notify: boolean) => {
+        try {
+            const candidates = await invoke<ToolchainCandidate[]>("detect_toolchain", {
+                config: {
+                    auto_detect: toolchain.autoDetect,
+                    toolchain_root: toolchain.toolchainRoot || null,
+                    nm_path: toolchain.nmPath || null,
+                    objdump_path: toolchain.objdumpPath || null,
+                    strings_path: toolchain.stringsPath || null,
+                },
+            });
+            if (!candidates || candidates.length === 0) {
+                if (notify) {
+                    msgApi.warning(uiText(language, "toolchainDetectFailed"));
+                }
+                return false;
+            }
+            const candidate = candidates[0];
+            const derivedRoot = deriveRootFromNm(candidate.paths.nm_path);
+            updateToolchain({
+                toolchainRoot: derivedRoot || toolchain.toolchainRoot,
+                nmPath: candidate.paths.nm_path,
+                objdumpPath: candidate.paths.objdump_path,
+                stringsPath: candidate.paths.strings_path,
+                lastDetected: candidate.source,
+            });
+            if (notify) {
+                msgApi.success(uiText(language, "toolchainDetectSuccess"));
+            }
+            return true;
+        } catch (error: any) {
+            if (notify) {
+                const messageText = error?.message || String(error);
+                msgApi.error(messageText);
+            }
+            return false;
+        }
+    };
+
     const startAnalysis = async () => {
+        if (toolchain.autoDetect && !hasToolchain) {
+            const detected = await detectToolchain(false);
+            if (!detected) {
+                msgApi.warning(uiText(language, "analysisNeedToolchain"));
+                setActivePage("settings");
+                return;
+            }
+        }
+
+        if (!toolchain.autoDetect && !hasToolchain) {
+            msgApi.warning(uiText(language, "analysisNeedToolchain"));
+            setActivePage("settings");
+            return;
+        }
+
         const elfSelected = await open({
             title: uiText(language, "analysisSelectElfTitle"),
             multiple: false,
             filters: [{ name: "ELF", extensions: ["elf"] }],
         });
         const elfPath = Array.isArray(elfSelected) ? elfSelected[0] : elfSelected;
-        if (!elfPath || typeof elfPath !== "string") return;
+        if (!elfPath || typeof elfPath !== "string") {
+            msgApi.info(uiText(language, "analysisMissingElf"));
+            return;
+        }
 
         setInputs({ elfPath });
 
@@ -131,6 +210,7 @@ export default function App() {
 
         setActivePage("dashboard");
         setStatus("running");
+        msgApi.loading(uiText(language, "analysisStart"), 0.8);
 
         const params: AnalyzeParams = {
             elf_path: elfPath,
@@ -148,11 +228,11 @@ export default function App() {
             const result = await invoke("analyze_firmware", { params });
             setResult(result as any);
             setStatus("success");
-            msgApi.success("\u5206\u6790\u5b8c\u6210");
+            msgApi.success(uiText(language, "analysisStart"));
         } catch (error: any) {
             const messageText = error?.message || String(error);
             setStatus("error", messageText);
-            msgApi.error(messageText);
+            msgApi.error(uiText(language, "analysisFailed", { msg: messageText }));
         }
     };
 
@@ -206,7 +286,7 @@ export default function App() {
                                     className="langSelect"
                                 />
                             </Space>
-                            <Tooltip title={uiText(language, "analysisHint")}>
+                            <Tooltip title={uiText(language, "analysisHint")}> 
                                 <Button type="primary" icon={<PlayCircleOutlined />} onClick={startAnalysis}>
                                     {uiText(language, "newAnalysis")}
                                 </Button>

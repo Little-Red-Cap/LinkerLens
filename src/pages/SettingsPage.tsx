@@ -1,9 +1,31 @@
-﻿import { Button, Card, Col, Form, Input, Row, Select, Space, Switch, Typography } from "antd";
+﻿import { Button, Card, Col, Form, Input, Row, Select, Space, Switch, Typography, message } from "antd";
 import { open } from "@tauri-apps/plugin-dialog";
+import { invoke } from "@tauri-apps/api/core";
 import { useCallback, useEffect } from "react";
 import { uiText } from "../domain/uiI18n";
 import { useSettingsStore } from "../store/settings.store";
 import { useUiStore } from "../store/ui.store";
+
+type ToolchainCandidate = {
+    source: string;
+    paths: {
+        nm_path: string;
+        objdump_path: string;
+        strings_path: string;
+    };
+};
+
+const deriveRootFromNm = (nmPath: string) => {
+    const normalized = nmPath.replace(/\\/g, "/");
+    const parts = normalized.split("/");
+    if (parts.length < 3) return "";
+    if (parts[parts.length - 1].startsWith("arm-none-eabi-nm")) {
+        const rootParts = parts.slice(0, -2);
+        const root = rootParts.join("/");
+        return nmPath.includes("\\") ? root.replace(/\//g, "\\") : root;
+    }
+    return "";
+};
 
 export default function SettingsPage() {
     const [form] = Form.useForm();
@@ -14,6 +36,7 @@ export default function SettingsPage() {
     const language = useUiStore((s) => s.language);
     const setTheme = useUiStore((s) => s.setTheme);
     const setLanguage = useUiStore((s) => s.setLanguage);
+    const [msgApi, contextHolder] = message.useMessage();
 
     useEffect(() => {
         form.setFieldsValue(toolchain);
@@ -40,8 +63,40 @@ export default function SettingsPage() {
         });
     }, [toolchain.nmPath, toolchain.objdumpPath, toolchain.stringsPath, updateToolchain]);
 
+    const detectToolchain = useCallback(async () => {
+        try {
+            const candidates = await invoke<ToolchainCandidate[]>("detect_toolchain", {
+                config: {
+                    auto_detect: toolchain.autoDetect,
+                    toolchain_root: toolchain.toolchainRoot || null,
+                    nm_path: toolchain.nmPath || null,
+                    objdump_path: toolchain.objdumpPath || null,
+                    strings_path: toolchain.stringsPath || null,
+                },
+            });
+            if (!candidates || candidates.length === 0) {
+                msgApi.warning(uiText(language, "toolchainDetectFailed"));
+                return;
+            }
+            const candidate = candidates[0];
+            const derivedRoot = deriveRootFromNm(candidate.paths.nm_path);
+            updateToolchain({
+                toolchainRoot: derivedRoot || toolchain.toolchainRoot,
+                nmPath: candidate.paths.nm_path,
+                objdumpPath: candidate.paths.objdump_path,
+                stringsPath: candidate.paths.strings_path,
+                lastDetected: candidate.source,
+            });
+            msgApi.success(uiText(language, "toolchainDetectSuccess"));
+        } catch (error: any) {
+            const messageText = error?.message || String(error);
+            msgApi.error(messageText);
+        }
+    }, [language, msgApi, toolchain, updateToolchain]);
+
     return (
         <Space direction="vertical" size="large" className="pageStack">
+            {contextHolder}
             <Card className="pageCard riseIn">
                 <Typography.Title level={4}>{uiText(language, "settingsToolchainTitle")}</Typography.Title>
                 <Typography.Text type="secondary">
@@ -92,6 +147,7 @@ export default function SettingsPage() {
                         <Col xs={24}>
                             <Space>
                                 <Button onClick={handleBrowseRoot}>{uiText(language, "settingsBrowse")}</Button>
+                                <Button onClick={detectToolchain}>{uiText(language, "settingsDetect")}</Button>
                                 <Button onClick={resetToolchain}>{uiText(language, "settingsReset")}</Button>
                             </Space>
                         </Col>
