@@ -34,6 +34,7 @@ export default function DashboardPage() {
     const totals = result?.summary.sections_totals;
     const symbols = result?.summary.top_symbols ?? [];
     const regions = result?.summary.memory_regions ?? [];
+    const cacheHit = result?.meta.cache?.hit ?? false;
 
     const flashValue = totals?.flashRegionBytes ?? totals?.flashBytes ?? null;
     const ramValue = totals?.ramRegionBytes ?? totals?.ramBytes ?? null;
@@ -175,6 +176,11 @@ export default function DashboardPage() {
                                         ? lastError
                                         : ""}
                             </Typography.Text>
+                            {result ? (
+                                <Tag color={cacheHit ? "green" : "default"}>
+                                    {cacheHit ? uiText(language, "analysisCacheHit") : uiText(language, "analysisCacheMiss")}
+                                </Tag>
+                            ) : null}
                         </Space>
                     </Card>
                 </Col>

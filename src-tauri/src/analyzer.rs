@@ -32,6 +32,7 @@ pub struct AnalysisMeta {
     pub elf_path: String,
     pub map_path: Option<String>,
     pub toolchain: ToolchainPaths,
+    pub cache: CacheMeta,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -103,6 +104,12 @@ pub struct Finding {
     pub value: u64,
     pub items: Vec<String>,
 }
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CacheMeta {
+    pub hit: bool,
+    pub key: String,
+}
 #[tauri::command]
 pub fn analyze_firmware(
     app: tauri::AppHandle,
@@ -112,7 +119,11 @@ pub fn analyze_firmware(
     validate_inputs(&params)?;
     let toolchain_paths = resolve_toolchain(params.toolchain.as_ref())?;
     let cache_key = build_cache_key(&toolchain_paths, &params)?;
-    if let Some(result) = load_cached_result(&app, &cache_key)? {
+    if let Some(mut result) = load_cached_result(&app, &cache_key)? {
+        result.meta.cache = CacheMeta {
+            hit: true,
+            key: cache_key.clone(),
+        };
         if let Some(symbols) = load_cached_symbols(&app, &cache_key)? {
             if let Ok(mut stored) = state.symbols.lock() {
                 *stored = symbols;
@@ -152,6 +163,10 @@ pub fn analyze_firmware(
             elf_path: params.elf_path,
             map_path: params.map_path,
             toolchain: toolchain_paths,
+            cache: CacheMeta {
+                hit: false,
+                key: cache_key.clone(),
+            },
         },
         summary: AnalysisSummary {
             sections_totals: totals,

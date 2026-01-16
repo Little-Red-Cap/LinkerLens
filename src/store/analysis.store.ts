@@ -50,6 +50,15 @@ type Finding = {
     items: string[];
 };
 
+type CacheMeta = {
+    hit: boolean;
+    key: string;
+};
+
+type AnalysisMeta = {
+    cache: CacheMeta;
+};
+
 type AnalysisSummary = {
     sections_totals: SectionTotals;
     top_symbols: SymbolInfo[];
@@ -62,6 +71,7 @@ type AnalysisSummary = {
 };
 
 type AnalysisResult = {
+    meta: AnalysisMeta;
     summary: AnalysisSummary;
 };
 
