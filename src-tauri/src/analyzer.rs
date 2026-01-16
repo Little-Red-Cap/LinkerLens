@@ -44,6 +44,8 @@ pub struct SectionTotals {
     pub rodata_bytes: u64,
     pub data_bytes: u64,
     pub bss_bytes: u64,
+    pub flash_region_bytes: Option<u64>,
+    pub ram_region_bytes: Option<u64>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -106,6 +108,7 @@ pub fn analyze_firmware(params: AnalyzeParams) -> Result<AnalysisResult, String>
     } else {
         (Vec::new(), Vec::new(), Vec::new(), Vec::new(), Vec::new())
     };
+    let totals = apply_region_totals(totals, &memory_regions);
 
     Ok(AnalysisResult {
         meta: AnalysisMeta {
@@ -214,7 +217,16 @@ fn parse_nm_symbols(output: &str) -> Vec<SymbolInfo> {
 }
 
 fn compute_section_totals(sections: &[SectionInfo]) -> SectionTotals {
-    let mut totals = SectionTotals::default();
+    let mut totals = SectionTotals {
+        flash_bytes: 0,
+        ram_bytes: 0,
+        text_bytes: 0,
+        rodata_bytes: 0,
+        data_bytes: 0,
+        bss_bytes: 0,
+        flash_region_bytes: None,
+        ram_region_bytes: None,
+    };
     for section in sections {
         match section.name.as_str() {
             ".text" => totals.text_bytes += section.size,
@@ -434,6 +446,26 @@ fn parse_memory_regions(contents: &str) -> Vec<MemoryRegion> {
     }
 
     regions
+}
+
+fn apply_region_totals(mut totals: SectionTotals, regions: &[MemoryRegion]) -> SectionTotals {
+    if regions.is_empty() {
+        return totals;
+    }
+    let mut flash_used = None;
+    let mut ram_used = None;
+    for region in regions {
+        let name = region.name.to_ascii_lowercase();
+        if name.contains("flash") || name.contains("rom") {
+            flash_used = Some(flash_used.unwrap_or(0) + region.used);
+        }
+        if name.contains("ram") || name.contains("sram") {
+            ram_used = Some(ram_used.unwrap_or(0) + region.used);
+        }
+    }
+    totals.flash_region_bytes = flash_used;
+    totals.ram_region_bytes = ram_used;
+    totals
 }
 
 fn parse_hex_or_dec(value: &str) -> u64 {

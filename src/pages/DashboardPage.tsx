@@ -3,8 +3,8 @@ import { uiText } from "../domain/uiI18n";
 import { useAnalysisStore } from "../store/analysis.store";
 import { useUiStore } from "../store/ui.store";
 
-const formatBytes = (value?: number) => {
-    if (!value) return "--";
+const formatBytes = (value?: number | null) => {
+    if (value == null) return "--";
     if (value < 1024) return `${value} B`;
     const kb = value / 1024;
     if (kb < 1024) return `${kb.toFixed(1)} KB`;
@@ -35,25 +35,28 @@ export default function DashboardPage() {
     const symbols = result?.summary.top_symbols ?? [];
     const regions = result?.summary.memory_regions ?? [];
 
+    const flashValue = totals?.flashRegionBytes ?? totals?.flashBytes ?? null;
+    const ramValue = totals?.ramRegionBytes ?? totals?.ramBytes ?? null;
+
     const summaryStats = [
         {
             label: uiText(language, "dashFlashUsed"),
-            value: formatBytes(totals?.flashBytes ?? 0),
+            value: formatBytes(flashValue),
             hint: totals ? "" : uiText(language, "dashAwaiting"),
         },
         {
             label: uiText(language, "dashRamUsed"),
-            value: formatBytes(totals?.ramBytes ?? 0),
+            value: formatBytes(ramValue),
             hint: totals ? "" : uiText(language, "dashAwaiting"),
         },
         {
             label: uiText(language, "dashBss"),
-            value: formatBytes(totals?.bssBytes ?? 0),
+            value: formatBytes(totals?.bssBytes ?? null),
             hint: totals ? "" : uiText(language, "dashNoData"),
         },
         {
             label: uiText(language, "dashData"),
-            value: formatBytes(totals?.dataBytes ?? 0),
+            value: formatBytes(totals?.dataBytes ?? null),
             hint: totals ? "" : uiText(language, "dashNoData"),
         },
     ];
@@ -80,8 +83,33 @@ export default function DashboardPage() {
     const regionColumns = [
         { title: uiText(language, "dashRegionName"), dataIndex: "name", key: "name" },
         { title: uiText(language, "dashRegionOrigin"), dataIndex: "origin", key: "origin" },
-        { title: uiText(language, "dashRegionLength"), dataIndex: "length", key: "length" },
-        { title: uiText(language, "dashRegionUsed"), dataIndex: "used", key: "used" },
+        {
+            title: uiText(language, "dashRegionLength"),
+            dataIndex: "length",
+            key: "length",
+            render: (value: number) => formatBytes(value),
+        },
+        {
+            title: uiText(language, "dashRegionUsed"),
+            key: "used",
+            render: (_: unknown, record: { used: number; length: number }) => {
+                const percent = record.length > 0 ? Math.min(100, (record.used / record.length) * 100) : 0;
+                const over = record.used > record.length;
+                return (
+                    <Space direction="vertical" size={4}>
+                        <Progress
+                            percent={percent}
+                            size="small"
+                            status={over ? "exception" : "normal"}
+                            showInfo={false}
+                        />
+                        <Typography.Text type={over ? "danger" : "secondary"}>
+                            {formatBytes(record.used)} / {formatBytes(record.length)}
+                        </Typography.Text>
+                    </Space>
+                );
+            },
+        },
     ];
 
     return (

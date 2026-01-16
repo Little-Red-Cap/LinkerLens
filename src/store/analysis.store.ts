@@ -13,6 +13,8 @@ type SectionTotals = {
     rodataBytes: number;
     dataBytes: number;
     bssBytes: number;
+    flashRegionBytes?: number | null;
+    ramRegionBytes?: number | null;
 };
 
 type SymbolInfo = {
