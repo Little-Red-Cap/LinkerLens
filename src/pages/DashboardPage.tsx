@@ -36,14 +36,14 @@ export default function DashboardPage() {
     const regions = result?.summary.memory_regions ?? [];
     const cacheHit = result?.meta.cache?.hit ?? false;
 
-    const flashValue = totals?.flashRegionBytes ?? totals?.flashBytes ?? null;
-    const ramValue = totals?.ramRegionBytes ?? totals?.ramBytes ?? null;
-    const flashBase = totals?.flashRegionBytes ?? totals?.flashBytes ?? 0;
-    const ramBase = totals?.ramRegionBytes ?? totals?.ramBytes ?? 0;
-    const flashSource = totals?.flashRegionBytes != null
+    const flashValue = totals?.flash_region_bytes ?? totals?.flash_bytes ?? null;
+    const ramValue = totals?.ram_region_bytes ?? totals?.ram_bytes ?? null;
+    const flashBase = totals?.flash_region_bytes ?? totals?.flash_bytes ?? 0;
+    const ramBase = totals?.ram_region_bytes ?? totals?.ram_bytes ?? 0;
+    const flashSource = totals?.flash_region_bytes != null
         ? uiText(language, "analysisSourceMap")
         : uiText(language, "analysisSourceEstimate");
-    const ramSource = totals?.ramRegionBytes != null
+    const ramSource = totals?.ram_region_bytes != null
         ? uiText(language, "analysisSourceMap")
         : uiText(language, "analysisSourceEstimate");
 
@@ -60,12 +60,12 @@ export default function DashboardPage() {
         },
         {
             label: uiText(language, "dashBss"),
-            value: formatBytes(totals?.bssBytes ?? null),
+            value: formatBytes(totals?.bss_bytes ?? null),
             hint: totals ? "" : uiText(language, "dashNoData"),
         },
         {
             label: uiText(language, "dashData"),
-            value: formatBytes(totals?.dataBytes ?? null),
+            value: formatBytes(totals?.data_bytes ?? null),
             hint: totals ? "" : uiText(language, "dashNoData"),
         },
     ];
@@ -211,30 +211,30 @@ export default function DashboardPage() {
                         <Divider />
                         <Space direction="vertical" size="small" className="progressStack">
                             <div className="progressRow">
-                                <span>.text {formatBytes(totals?.textBytes ?? null)}</span>
+                                <span>.text {formatBytes(totals?.text_bytes ?? null)}</span>
                                 <Progress
-                                    percent={totals?.textBytes ? (totals.textBytes / (flashBase || 1)) * 100 : 0}
+                                    percent={totals?.text_bytes ? (totals.text_bytes / (flashBase || 1)) * 100 : 0}
                                     showInfo={false}
                                 />
                             </div>
                             <div className="progressRow">
-                                <span>.rodata {formatBytes(totals?.rodataBytes ?? null)}</span>
+                                <span>.rodata {formatBytes(totals?.rodata_bytes ?? null)}</span>
                                 <Progress
-                                    percent={totals?.rodataBytes ? (totals.rodataBytes / (flashBase || 1)) * 100 : 0}
+                                    percent={totals?.rodata_bytes ? (totals.rodata_bytes / (flashBase || 1)) * 100 : 0}
                                     showInfo={false}
                                 />
                             </div>
                             <div className="progressRow">
-                                <span>.data {formatBytes(totals?.dataBytes ?? null)}</span>
+                                <span>.data {formatBytes(totals?.data_bytes ?? null)}</span>
                                 <Progress
-                                    percent={totals?.dataBytes ? (totals.dataBytes / (flashBase || 1)) * 100 : 0}
+                                    percent={totals?.data_bytes ? (totals.data_bytes / (flashBase || 1)) * 100 : 0}
                                     showInfo={false}
                                 />
                             </div>
                             <div className="progressRow">
-                                <span>.bss {formatBytes(totals?.bssBytes ?? null)}</span>
+                                <span>.bss {formatBytes(totals?.bss_bytes ?? null)}</span>
                                 <Progress
-                                    percent={totals?.bssBytes ? (totals.bssBytes / (ramBase || 1)) * 100 : 0}
+                                    percent={totals?.bss_bytes ? (totals.bss_bytes / (ramBase || 1)) * 100 : 0}
                                     showInfo={false}
                                 />
                             </div>

@@ -7,14 +7,14 @@ type AnalysisInputs = {
 };
 
 type SectionTotals = {
-    flashBytes: number;
-    ramBytes: number;
-    textBytes: number;
-    rodataBytes: number;
-    dataBytes: number;
-    bssBytes: number;
-    flashRegionBytes?: number | null;
-    ramRegionBytes?: number | null;
+    flash_bytes: number;
+    ram_bytes: number;
+    text_bytes: number;
+    rodata_bytes: number;
+    data_bytes: number;
+    bss_bytes: number;
+    flash_region_bytes?: number | null;
+    ram_region_bytes?: number | null;
 };
 
 type SymbolInfo = {
