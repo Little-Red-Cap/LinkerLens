@@ -66,6 +66,12 @@ export type UiKey =
     | "dashTopSymbolsEmpty"
     | "dashInputTitle"
     | "dashInputHint"
+    | "dashRegionsTitle"
+    | "dashRegionsHint"
+    | "dashRegionName"
+    | "dashRegionOrigin"
+    | "dashRegionLength"
+    | "dashRegionUsed"
     | "symbolsSearchPlaceholder"
     | "symbolsSectionPlaceholder"
     | "symbolsTypePlaceholder"
@@ -167,6 +173,12 @@ const zh: Record<UiKey, string> = {
     dashTopSymbolsEmpty: "运行分析后填充符号列表。",
     dashInputTitle: "分析输入",
     dashInputHint: "当前选择的固件与映射文件。",
+    dashRegionsTitle: "内存区域",
+    dashRegionsHint: "来自 MAP 的内存区域配置与占用。",
+    dashRegionName: "区域",
+    dashRegionOrigin: "起始",
+    dashRegionLength: "长度",
+    dashRegionUsed: "已用",
     symbolsSearchPlaceholder: "搜索符号名或正则",
     symbolsSectionPlaceholder: "段",
     symbolsTypePlaceholder: "类型",
@@ -269,6 +281,12 @@ const en: Record<UiKey, string> = {
     dashTopSymbolsEmpty: "Run analysis to populate symbols.",
     dashInputTitle: "Analysis Inputs",
     dashInputHint: "Currently selected firmware and map files.",
+    dashRegionsTitle: "Memory Regions",
+    dashRegionsHint: "Memory regions from MAP and their usage.",
+    dashRegionName: "Region",
+    dashRegionOrigin: "Origin",
+    dashRegionLength: "Length",
+    dashRegionUsed: "Used",
     symbolsSearchPlaceholder: "Search symbol name or regex",
     symbolsSectionPlaceholder: "Section",
     symbolsTypePlaceholder: "Type",

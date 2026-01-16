@@ -33,6 +33,7 @@ export default function DashboardPage() {
     const lastError = useAnalysisStore((s) => s.lastError);
     const totals = result?.summary.sections_totals;
     const symbols = result?.summary.top_symbols ?? [];
+    const regions = result?.summary.memory_regions ?? [];
 
     const summaryStats = [
         {
@@ -74,6 +75,13 @@ export default function DashboardPage() {
         { title: uiText(language, "symbolsColumnSymbol"), dataIndex: "name", key: "name" },
         { title: uiText(language, "symbolsColumnSize"), dataIndex: "size", key: "size" },
         { title: uiText(language, "symbolsColumnSection"), dataIndex: "section_guess", key: "section" },
+    ];
+
+    const regionColumns = [
+        { title: uiText(language, "dashRegionName"), dataIndex: "name", key: "name" },
+        { title: uiText(language, "dashRegionOrigin"), dataIndex: "origin", key: "origin" },
+        { title: uiText(language, "dashRegionLength"), dataIndex: "length", key: "length" },
+        { title: uiText(language, "dashRegionUsed"), dataIndex: "used", key: "used" },
     ];
 
     return (
@@ -195,6 +203,19 @@ export default function DashboardPage() {
                     </Card>
                 </Col>
             </Row>
+
+            <Card className="pageCard riseIn" style={{ animationDelay: "260ms" }}>
+                <Typography.Title level={4}>{uiText(language, "dashRegionsTitle")}</Typography.Title>
+                <Typography.Text type="secondary">{uiText(language, "dashRegionsHint")}</Typography.Text>
+                <Divider />
+                <Table
+                    columns={regionColumns}
+                    dataSource={regions}
+                    rowKey={(row) => row.name}
+                    pagination={false}
+                    locale={{ emptyText: <Empty description={uiText(language, "objectsMapEmpty")} /> }}
+                />
+            </Card>
         </Space>
     );
 }

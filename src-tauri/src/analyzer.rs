@@ -33,6 +33,7 @@ pub struct AnalysisSummary {
     pub top_libraries: Vec<ObjectContribution>,
     pub top_sections: Vec<ObjectContribution>,
     pub map_tree: Vec<TreeNode>,
+    pub memory_regions: Vec<MemoryRegion>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
@@ -74,6 +75,14 @@ pub struct TreeNode {
     pub size: u64,
     pub children: Vec<TreeNode>,
 }
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MemoryRegion {
+    pub name: String,
+    pub origin: String,
+    pub length: u64,
+    pub used: u64,
+}
 #[tauri::command]
 pub fn analyze_firmware(params: AnalyzeParams) -> Result<AnalysisResult, String> {
     validate_inputs(&params)?;
@@ -91,10 +100,11 @@ pub fn analyze_firmware(params: AnalyzeParams) -> Result<AnalysisResult, String>
     symbols.truncate(50);
 
     let totals = compute_section_totals(&sections);
-    let (top_objects, top_libraries, top_sections, map_tree) = if let Some(map_path) = params.map_path.as_ref() {
-        parse_map_contributions(map_path)?
+    let (top_objects, top_libraries, top_sections, map_tree, memory_regions) =
+        if let Some(map_path) = params.map_path.as_ref() {
+            parse_map_contributions(map_path)?
     } else {
-        (Vec::new(), Vec::new(), Vec::new(), Vec::new())
+        (Vec::new(), Vec::new(), Vec::new(), Vec::new(), Vec::new())
     };
 
     Ok(AnalysisResult {
@@ -110,6 +120,7 @@ pub fn analyze_firmware(params: AnalyzeParams) -> Result<AnalysisResult, String>
             top_libraries,
             top_sections,
             map_tree,
+            memory_regions,
         },
         sections,
     })
@@ -231,7 +242,16 @@ fn guess_section(kind: &str) -> String {
 
 fn parse_map_contributions(
     map_path: &str,
-) -> Result<(Vec<ObjectContribution>, Vec<ObjectContribution>, Vec<ObjectContribution>, Vec<TreeNode>), String> {
+) -> Result<
+    (
+        Vec<ObjectContribution>,
+        Vec<ObjectContribution>,
+        Vec<ObjectContribution>,
+        Vec<TreeNode>,
+        Vec<MemoryRegion>,
+    ),
+    String,
+> {
     let contents =
         fs::read_to_string(map_path).map_err(|e| format!("Failed to read MAP file {}: {}", map_path, e))?;
     let mut objects: std::collections::HashMap<String, u64> = std::collections::HashMap::new();
@@ -239,6 +259,7 @@ fn parse_map_contributions(
     let mut sections: std::collections::HashMap<String, u64> = std::collections::HashMap::new();
     let mut tree: std::collections::HashMap<String, std::collections::HashMap<String, u64>> =
         std::collections::HashMap::new();
+    let memory_regions = parse_memory_regions(&contents);
 
     for line in contents.lines() {
         let trimmed = line.trim_start();
@@ -284,7 +305,7 @@ fn parse_map_contributions(
     let top_sections = top_contributions(sections, 8);
     let map_tree = build_tree(tree, 20, 40);
 
-    Ok((top_objects, top_libraries, top_sections, map_tree))
+    Ok((top_objects, top_libraries, top_sections, map_tree, memory_regions))
 }
 
 fn top_contributions(map: std::collections::HashMap<String, u64>, limit: usize) -> Vec<ObjectContribution> {
@@ -374,4 +395,51 @@ fn build_tree(
         libs.truncate(lib_limit);
     }
     libs
+}
+
+fn parse_memory_regions(contents: &str) -> Vec<MemoryRegion> {
+    let mut regions = Vec::new();
+    let mut in_section = false;
+    let mut header_seen = false;
+
+    for line in contents.lines() {
+        let trimmed = line.trim();
+        if trimmed.starts_with("Memory Configuration") {
+            in_section = true;
+            continue;
+        }
+        if in_section && trimmed.starts_with("Name") {
+            header_seen = true;
+            continue;
+        }
+        if in_section && header_seen {
+            if trimmed.is_empty() {
+                break;
+            }
+            let parts: Vec<&str> = trimmed.split_whitespace().collect();
+            if parts.len() < 4 {
+                continue;
+            }
+            let name = parts[0].to_string();
+            let origin = parts[1].to_string();
+            let length = parse_hex_or_dec(parts[2]);
+            let used = parts.get(3).map(|v| parse_hex_or_dec(v)).unwrap_or(0);
+            regions.push(MemoryRegion {
+                name,
+                origin,
+                length,
+                used,
+            });
+        }
+    }
+
+    regions
+}
+
+fn parse_hex_or_dec(value: &str) -> u64 {
+    if let Some(hex) = value.strip_prefix("0x") {
+        u64::from_str_radix(hex, 16).unwrap_or(0)
+    } else {
+        value.parse::<u64>().unwrap_or(0)
+    }
 }

@@ -34,6 +34,13 @@ type TreeNode = {
     children: TreeNode[];
 };
 
+type MemoryRegion = {
+    name: string;
+    origin: string;
+    length: number;
+    used: number;
+};
+
 type AnalysisSummary = {
     sections_totals: SectionTotals;
     top_symbols: SymbolInfo[];
@@ -41,6 +48,7 @@ type AnalysisSummary = {
     top_libraries: ObjectContribution[];
     top_sections: ObjectContribution[];
     map_tree: TreeNode[];
+    memory_regions: MemoryRegion[];
 };
 
 type AnalysisResult = {
