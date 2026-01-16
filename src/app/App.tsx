@@ -12,9 +12,11 @@ import {
     Tag,
     Tooltip,
     Typography,
+    message,
     theme as antdTheme,
 } from "antd";
 import { open } from "@tauri-apps/plugin-dialog";
+import { invoke } from "@tauri-apps/api/core";
 import {
     AlertOutlined,
     ApartmentOutlined,
@@ -38,6 +40,18 @@ const { Header, Content } = Layout;
 
 type PageKey = "dashboard" | "symbols" | "objects" | "findings" | "settings";
 
+type AnalyzeParams = {
+    elf_path: string;
+    map_path?: string | null;
+    toolchain?: {
+        auto_detect: boolean;
+        toolchain_root?: string | null;
+        nm_path?: string | null;
+        objdump_path?: string | null;
+        strings_path?: string | null;
+    };
+};
+
 export default function App() {
     const [activePage, setActivePage] = useState<PageKey>("dashboard");
     const screens = Grid.useBreakpoint();
@@ -48,6 +62,9 @@ export default function App() {
     const setTheme = useUiStore((s) => s.setTheme);
     const setLanguage = useUiStore((s) => s.setLanguage);
     const setInputs = useAnalysisStore((s) => s.setInputs);
+    const setStatus = useAnalysisStore((s) => s.setStatus);
+    const setResult = useAnalysisStore((s) => s.setResult);
+    const [msgApi, contextHolder] = message.useMessage();
 
     useEffect(() => {
         document.documentElement.dataset.theme = themeMode;
@@ -113,6 +130,30 @@ export default function App() {
         }
 
         setActivePage("dashboard");
+        setStatus("running");
+
+        const params: AnalyzeParams = {
+            elf_path: elfPath,
+            map_path: typeof mapPath === "string" ? mapPath : null,
+            toolchain: {
+                auto_detect: toolchain.autoDetect,
+                toolchain_root: toolchain.toolchainRoot || null,
+                nm_path: toolchain.nmPath || null,
+                objdump_path: toolchain.objdumpPath || null,
+                strings_path: toolchain.stringsPath || null,
+            },
+        };
+
+        try {
+            const result = await invoke("analyze_firmware", { params });
+            setResult(result as any);
+            setStatus("success");
+            msgApi.success("\u5206\u6790\u5b8c\u6210");
+        } catch (error: any) {
+            const messageText = error?.message || String(error);
+            setStatus("error", messageText);
+            msgApi.error(messageText);
+        }
     };
 
     return (
@@ -126,6 +167,7 @@ export default function App() {
                 },
             }}
         >
+            {contextHolder}
             <div className="appShell">
                 <Header className="appHeader">
                     <div className="appHeaderInner">

@@ -2,9 +2,11 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 mod font_pipeline;
+mod analyzer;
 mod fs_utils;
 mod settings;
 mod system_fonts;
+mod toolchain;
 
 fn main() {
     tauri::Builder::default()
@@ -15,7 +17,9 @@ fn main() {
             settings::load_settings,
             font_pipeline::generate_font,
             font_pipeline::export_font,
-            system_fonts::list_system_fonts
+            system_fonts::list_system_fonts,
+            toolchain::detect_toolchain,
+            analyzer::analyze_firmware
         ])
         .run(tauri::generate_context!())
         .expect("Failed to run Tauri application");
