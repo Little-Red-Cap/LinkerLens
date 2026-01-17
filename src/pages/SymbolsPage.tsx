@@ -1,9 +1,17 @@
-﻿import { Button, Card, Col, Input, Row, Select, Space, Table, Typography } from "antd";
+﻿import { Button, Card, Col, Input, Row, Select, Space, Table, Tooltip, Typography } from "antd";
 import { invoke } from "@tauri-apps/api/core";
 import { useEffect, useState } from "react";
 import { uiText } from "../domain/uiI18n";
 import { useAnalysisStore } from "../store/analysis.store";
 import { useUiStore } from "../store/ui.store";
+
+const formatBytes = (value: number) => {
+    if (value < 1024) return `${value} B`;
+    const kb = value / 1024;
+    if (kb < 1024) return `${kb.toFixed(1)} KB`;
+    const mb = kb / 1024;
+    return `${mb.toFixed(2)} MB`;
+};
 
 type SymbolInfo = {
     name: string;
@@ -28,6 +36,8 @@ export default function SymbolsPage() {
     const [page, setPage] = useState(1);
     const [pageSize, setPageSize] = useState(20);
     const [loading, setLoading] = useState(false);
+    const [sortKey, setSortKey] = useState<"size" | "name" | "kind" | "section_guess">("size");
+    const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
 
     const columns = [
         {
@@ -36,15 +46,45 @@ export default function SymbolsPage() {
             key: "name",
             ellipsis: true,
             width: 360,
+            sorter: true,
+            sortOrder: sortKey === "name" ? (sortOrder === "asc" ? "ascend" : "descend") : undefined,
         },
-        { title: uiText(language, "symbolsColumnSize"), dataIndex: "size", key: "size", width: 120 },
-        { title: uiText(language, "symbolsColumnType"), dataIndex: "kind", key: "type", width: 90 },
+        {
+            title: uiText(language, "symbolsColumnSize"),
+            dataIndex: "size",
+            key: "size",
+            width: 120,
+            render: (value: number, record: SymbolInfo) => {
+                if (value === 0) {
+                    const kind = record.kind?.toLowerCase();
+                    const noteKey = kind === "a" ? "symbolsAbsoluteNote" : "symbolsNoSizeNote";
+                    return (
+                        <Tooltip title={uiText(language, noteKey)}>
+                            <Typography.Text type="secondary">--</Typography.Text>
+                        </Tooltip>
+                    );
+                }
+                return formatBytes(value);
+            },
+            sorter: true,
+            sortOrder: sortKey === "size" ? (sortOrder === "asc" ? "ascend" : "descend") : undefined,
+        },
+        {
+            title: uiText(language, "symbolsColumnType"),
+            dataIndex: "kind",
+            key: "type",
+            width: 90,
+            sorter: true,
+            sortOrder: sortKey === "kind" ? (sortOrder === "asc" ? "ascend" : "descend") : undefined,
+        },
         {
             title: uiText(language, "symbolsColumnSection"),
             dataIndex: "section_guess",
             key: "section",
             ellipsis: true,
             width: 140,
+            sorter: true,
+            sortOrder: sortKey === "section_guess" ? (sortOrder === "asc" ? "ascend" : "descend") : undefined,
         },
     ];
 
@@ -62,8 +102,8 @@ export default function SymbolsPage() {
                         query: search || null,
                         page,
                         page_size: pageSize,
-                        sort: "size",
-                        order: "desc",
+                        sort: sortKey,
+                        order: sortOrder,
                     },
                 });
                 setData(result.items || []);
@@ -73,7 +113,7 @@ export default function SymbolsPage() {
             }
         };
         load();
-    }, [analysisStatus, page, pageSize, search]);
+    }, [analysisStatus, page, pageSize, search, sortKey, sortOrder]);
 
     const onSearch = () => {
         setPage(1);
@@ -132,6 +172,17 @@ export default function SymbolsPage() {
                     loading={loading}
                     tableLayout="fixed"
                     className="symbolsTable"
+                    onChange={(_, __, sorter) => {
+                        if (Array.isArray(sorter)) return;
+                        const nextOrder = sorter.order === "ascend" ? "asc" : "desc";
+                        const nextKey =
+                            sorter.field === "name" || sorter.field === "size" || sorter.field === "kind"
+                                ? sorter.field
+                                : "section_guess";
+                        setSortKey(nextKey);
+                        setSortOrder(nextOrder);
+                        setPage(1);
+                    }}
                     pagination={{
                         current: page,
                         pageSize,

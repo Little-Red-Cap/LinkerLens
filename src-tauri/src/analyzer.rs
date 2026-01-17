@@ -388,12 +388,16 @@ fn parse_nm_symbols(output: &str) -> Vec<SymbolInfo> {
         }
         let addr = parts.get(0).map(|v| v.to_string());
         let size_hex = parts.get(1).unwrap_or(&"");
-        let size = u64::from_str_radix(size_hex, 16).unwrap_or(0);
-        if size == 0 {
-            continue;
-        }
+        let mut size = u64::from_str_radix(size_hex, 16).unwrap_or(0);
         let kind = parts.get(2).unwrap_or(&"?").to_string();
         let name = parts[3..].join(" ");
+        let is_linker_symbol = is_linker_symbol_name(&name);
+        if is_linker_symbol {
+            size = 0;
+        }
+        if size == 0 && !is_linker_symbol {
+            continue;
+        }
         let section_guess = guess_section(&kind);
         symbols.push(SymbolInfo {
             name,
@@ -443,6 +447,35 @@ fn guess_section(kind: &str) -> String {
         _ => "other",
     }
     .to_string()
+}
+
+fn is_linker_symbol_name(name: &str) -> bool {
+    let lower = name.to_ascii_lowercase();
+    if !lower.starts_with('_') {
+        return false;
+    }
+    let keywords = [
+        "estack",
+        "stack",
+        "heap",
+        "sidata",
+        "sdata",
+        "edata",
+        "sbss",
+        "ebss",
+        "bss",
+        "data",
+        "_end",
+        "__end",
+        "min_stack_size",
+        "min_heap_size",
+        "stack_limit",
+        "heap_limit",
+        "heap_base",
+        "stack_top",
+        "stack_end",
+    ];
+    keywords.iter().any(|keyword| lower.contains(keyword))
 }
 
 fn parse_map_contributions(
@@ -1140,7 +1173,7 @@ fn count_strings_lines(program: &str, elf_path: &str) -> Result<u64, String> {
 }
 
 fn build_cache_key(toolchain: &ToolchainPaths, params: &AnalyzeParams) -> Result<String, String> {
-    let cache_version = "v11";
+    let cache_version = "v12";
     let elf_hash = hash_file(&params.elf_path)?;
     let map_hash = match params.map_path.as_ref().map(|p| p.trim()).filter(|p| !p.is_empty()) {
         Some(path) => hash_file(path)?,
