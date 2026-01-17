@@ -1103,13 +1103,6 @@ fn parse_region_legacy(parts: &[&str]) -> (String, u64, Option<u64>) {
     (origin, length, None)
 }
 
-fn parse_optional_number(value: &str) -> Option<u64> {
-    if let Some(hex) = value.strip_prefix("0x") {
-        return u64::from_str_radix(hex, 16).ok();
-    }
-    value.parse::<u64>().ok()
-}
-
 fn apply_region_totals(mut totals: SectionTotals, regions: &[MemoryRegion]) -> SectionTotals {
     if regions.is_empty() {
         return totals;
