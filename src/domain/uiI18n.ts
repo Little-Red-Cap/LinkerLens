@@ -27,6 +27,7 @@ export type UiKey =
     | "analysisNotSet"
     | "analysisNeedToolchain"
     | "analysisMissingElf"
+    | "analysisRunCurrent"
     | "analysisStart"
     | "analysisFailed"
     | "analysisStatusTitle"
@@ -171,6 +172,7 @@ const zh: Record<UiKey, string> = {
     analysisNotSet: "未选择",
     analysisNeedToolchain: "请先配置工具链路径",
     analysisMissingElf: "请先选择 ELF 文件",
+    analysisRunCurrent: "使用当前输入分析",
     analysisStart: "开始分析",
     analysisFailed: "分析失败：{msg}",
     analysisStatusTitle: "分析状态",
@@ -316,6 +318,7 @@ const en: Record<UiKey, string> = {
     analysisNotSet: "Not set",
     analysisNeedToolchain: "Please configure the toolchain first.",
     analysisMissingElf: "Please select an ELF file.",
+    analysisRunCurrent: "Analyze current inputs",
     analysisStart: "Analysis started",
     analysisFailed: "Analysis failed: {msg}",
     analysisStatusTitle: "Analysis Status",
