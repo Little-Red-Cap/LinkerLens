@@ -3,21 +3,22 @@ import { open } from "@tauri-apps/plugin-dialog";
 import { invoke } from "@tauri-apps/api/core";
 import { useCallback, useEffect } from "react";
 import { uiText } from "../domain/uiI18n";
-import { ToolchainCandidate, deriveRootFromNm } from "../domain/toolchain";
+import type { Language } from "../domain/i18n";
+import {type ToolchainCandidate, deriveRootFromNm } from "../domain/toolchain";
 import { useAnalysisStore } from "../store/analysis.store";
 import { useSettingsStore } from "../store/settings.store";
 import { useUiStore } from "../store/ui.store";
 
-const statusLabel = (language: string, status: string) => {
+const statusLabel = (language: Language, status: string) => {
     switch (status) {
         case "running":
-            return uiText(language as any, "analysisStatusRunning");
+            return uiText(language, "analysisStatusRunning");
         case "success":
-            return uiText(language as any, "analysisStatusSuccess");
+            return uiText(language, "analysisStatusSuccess");
         case "error":
-            return uiText(language as any, "analysisStatusError");
+            return uiText(language, "analysisStatusError");
         default:
-            return uiText(language as any, "analysisStatusIdle");
+            return uiText(language, "analysisStatusIdle");
     }
 };
 
