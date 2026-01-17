@@ -80,6 +80,7 @@ export type UiKey =
     | "dashInputHint"
     | "dashRegionsTitle"
     | "dashRegionsHint"
+    | "dashRegionsUsageNote"
     | "dashRegionName"
     | "dashRegionOrigin"
     | "dashRegionLength"
@@ -205,6 +206,7 @@ const zh: Record<UiKey, string> = {
     dashInputHint: "当前选择的固件与映射文件。",
     dashRegionsTitle: "内存区域",
     dashRegionsHint: "来自 MAP 的内存区域配置与占用。",
+    dashRegionsUsageNote: "已用统计按 VMA 归属区域，不包含对齐填充；FLASH 不含 .data 的 LMA 镜像。",
     dashRegionName: "区域",
     dashRegionOrigin: "起始",
     dashRegionLength: "长度",
@@ -331,6 +333,7 @@ const en: Record<UiKey, string> = {
     dashInputHint: "Currently selected firmware and map files.",
     dashRegionsTitle: "Memory Regions",
     dashRegionsHint: "Memory regions from MAP and their usage.",
+    dashRegionsUsageNote: "Used values follow VMA regions, excluding alignment padding; FLASH does not include .data LMA images.",
     dashRegionName: "Region",
     dashRegionOrigin: "Origin",
     dashRegionLength: "Length",

@@ -1,5 +1,6 @@
-﻿import { Card, Col, Divider, Empty, Progress, Row, Space, Table, Tag, Typography } from "antd";
+﻿import { Card, Col, Divider, Empty, Progress, Row, Space, Table, Tag, Tooltip, Typography } from "antd";
 import { useState } from "react";
+import { InfoCircleOutlined } from "@ant-design/icons";
 import { uiText } from "../domain/uiI18n";
 import { useAnalysisStore } from "../store/analysis.store";
 import { useUiStore } from "../store/ui.store";
@@ -33,6 +34,7 @@ export default function DashboardPage() {
     const status = useAnalysisStore((s) => s.status);
     const lastError = useAnalysisStore((s) => s.lastError);
     const [showUsedBytes, setShowUsedBytes] = useState(false);
+    const toggleUsedUnit = () => setShowUsedBytes((prev) => !prev);
     const totals = result?.summary.sections_totals;
     const symbols = result?.summary.top_symbols ?? [];
     const regions = result?.summary.memory_regions ?? [];
@@ -106,21 +108,31 @@ export default function DashboardPage() {
                 const usedLabel = showUsedBytes ? `${usedValue} B` : formatBytes(usedValue);
                 const lengthLabel = showUsedBytes ? `${record.length} B` : formatBytes(record.length);
                 return (
-                    <Space direction="vertical" size={4}>
-                        <Progress
-                            percent={Number(percent.toFixed(1))}
-                            size="small"
-                            status={over ? "exception" : "normal"}
-                            showInfo
-                        />
-                        <Typography.Text
-                            type={over ? "danger" : "secondary"}
-                            style={{ cursor: "pointer" }}
-                            onClick={() => setShowUsedBytes((prev) => !prev)}
-                        >
-                            {usedLabel} / {lengthLabel}
-                        </Typography.Text>
-                    </Space>
+                    <div
+                        className="regionUsedCell"
+                        role="button"
+                        tabIndex={0}
+                        onClick={toggleUsedUnit}
+                        onKeyDown={(event) => {
+                            if (event.key === "Enter" || event.key === " ") {
+                                event.preventDefault();
+                                toggleUsedUnit();
+                            }
+                        }}
+                        style={{ cursor: "pointer" }}
+                    >
+                        <Space direction="vertical" size={4}>
+                            <Progress
+                                percent={Number(percent.toFixed(1))}
+                                size="small"
+                                status={over ? "exception" : "normal"}
+                                showInfo
+                            />
+                            <Typography.Text type={over ? "danger" : "secondary"}>
+                                {usedLabel} / {lengthLabel}
+                            </Typography.Text>
+                        </Space>
+                    </div>
                 );
             },
         },
@@ -179,7 +191,17 @@ export default function DashboardPage() {
             </Row>
 
             <Card className="pageCard riseIn" style={{ animationDelay: "260ms" }}>
-                <Typography.Title level={4}>{uiText(language, "dashRegionsTitle")}</Typography.Title>
+                <Space size="small" align="center" wrap>
+                    <Typography.Title level={4}>{uiText(language, "dashRegionsTitle")}</Typography.Title>
+                    <Tooltip title={uiText(language, "dashRegionsUsageNote")}>
+                        <InfoCircleOutlined style={{ color: "rgba(0, 0, 0, 0.45)" }} />
+                    </Tooltip>
+                    <Tooltip title={uiText(language, "dashRegionsUsageNote")}>
+                        <Typography.Text type="secondary" style={{ cursor: "help" }}>
+                            统计口径
+                        </Typography.Text>
+                    </Tooltip>
+                </Space>
                 <Typography.Text type="secondary">{uiText(language, "dashRegionsHint")}</Typography.Text>
                 <Divider />
                 <Table
