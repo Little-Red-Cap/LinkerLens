@@ -3,30 +3,10 @@ import { open } from "@tauri-apps/plugin-dialog";
 import { invoke } from "@tauri-apps/api/core";
 import { useCallback, useEffect } from "react";
 import { uiText } from "../domain/uiI18n";
+import { ToolchainCandidate, deriveRootFromNm } from "../domain/toolchain";
 import { useAnalysisStore } from "../store/analysis.store";
 import { useSettingsStore } from "../store/settings.store";
 import { useUiStore } from "../store/ui.store";
-
-type ToolchainCandidate = {
-    source: string;
-    paths: {
-        nm_path: string;
-        objdump_path: string;
-        strings_path: string;
-    };
-};
-
-const deriveRootFromNm = (nmPath: string) => {
-    const normalized = nmPath.replace(/\\/g, "/");
-    const parts = normalized.split("/");
-    if (parts.length < 3) return "";
-    if (parts[parts.length - 1].startsWith("arm-none-eabi-nm")) {
-        const rootParts = parts.slice(0, -2);
-        const root = rootParts.join("/");
-        return nmPath.includes("\\") ? root.replace(/\//g, "\\") : root;
-    }
-    return "";
-};
 
 const statusLabel = (language: string, status: string) => {
     switch (status) {
@@ -104,8 +84,8 @@ export default function SettingsPage() {
                 lastDetected: candidate.source,
             });
             msgApi.success(uiText(language, "toolchainDetectSuccess"));
-        } catch (error: any) {
-            const messageText = error?.message || String(error);
+        } catch (error: unknown) {
+            const messageText = error instanceof Error ? error.message : String(error);
             msgApi.error(messageText);
         }
     }, [language, msgApi, toolchain, updateToolchain]);

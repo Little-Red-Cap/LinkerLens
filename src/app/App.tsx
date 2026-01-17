@@ -33,7 +33,9 @@ import SettingsPage from "../pages/SettingsPage";
 import SymbolsPage from "../pages/SymbolsPage";
 import LookupPage from "../pages/LookupPage";
 import { uiText } from "../domain/uiI18n";
-import { useAnalysisStore } from "../store/analysis.store";
+import type {AnalyzeParams} from "../domain/analyzeTypes";
+import {type ToolchainCandidate, deriveRootFromNm } from "../domain/toolchain";
+import { useAnalysisStore, type AnalysisResult } from "../store/analysis.store";
 import { useSettingsStore } from "../store/settings.store";
 import { useUiStore } from "../store/ui.store";
 import "../App.css";
@@ -133,9 +135,9 @@ export default function App() {
                 msgApi.success(uiText(language, "toolchainDetectSuccess"));
             }
             return true;
-        } catch (error: any) {
+        } catch (error: unknown) {
             if (notify) {
-                const messageText = error?.message || String(error);
+                const messageText = error instanceof Error ? error.message : String(error);
                 msgApi.error(messageText);
             }
             return false;
@@ -198,12 +200,12 @@ export default function App() {
         };
 
         try {
-            const result = await invoke("analyze_firmware", { params });
-            setResult(result as any);
+            const result = await invoke<AnalysisResult>("analyze_firmware", { params });
+            setResult(result);
             setStatus("success");
             msgApi.success(uiText(language, "analysisStart"));
-        } catch (error: any) {
-            const messageText = error?.message || String(error);
+        } catch (error: unknown) {
+            const messageText = error instanceof Error ? error.message : String(error);
             setStatus("error", messageText);
             msgApi.error(uiText(language, "analysisFailed", { msg: messageText }));
         }

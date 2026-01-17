@@ -72,7 +72,7 @@ type AnalysisSummary = {
     findings: Finding[];
 };
 
-type AnalysisResult = {
+export type AnalysisResult = {
     meta: AnalysisMeta;
     summary: AnalysisSummary;
 };
