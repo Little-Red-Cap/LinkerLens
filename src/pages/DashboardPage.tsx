@@ -1,8 +1,13 @@
-﻿import { Card, Col, Divider, Empty, Progress, Row, Segmented, Space, Table, Tag, Tooltip, Typography } from "antd";
+﻿import { Button, Card, Col, Divider, Empty, Progress, Row, Segmented, Space, Table, Tag, Tooltip, Typography, message } from "antd";
 import { useState } from "react";
 import { InfoCircleOutlined } from "@ant-design/icons";
+import { invoke } from "@tauri-apps/api/core";
 import { uiText } from "../domain/uiI18n";
+import type { AnalyzeParams } from "../domain/analyzeTypes";
+import { type ToolchainCandidate, deriveRootFromNm } from "../domain/toolchain";
 import { useAnalysisStore } from "../store/analysis.store";
+import type { AnalysisResult } from "../store/analysis.store";
+import { useSettingsStore } from "../store/settings.store";
 import { useUiStore } from "../store/ui.store";
 
 const formatBytes = (value?: number | null) => {
@@ -33,14 +38,22 @@ export default function DashboardPage() {
     const result = useAnalysisStore((s) => s.result);
     const status = useAnalysisStore((s) => s.status);
     const lastError = useAnalysisStore((s) => s.lastError);
+    const setStatus = useAnalysisStore((s) => s.setStatus);
+    const setResult = useAnalysisStore((s) => s.setResult);
+    const toolchain = useSettingsStore((s) => s.toolchain);
+    const updateToolchain = useSettingsStore((s) => s.updateToolchain);
     const [showUsedBytes, setShowUsedBytes] = useState(false);
     const [usageBasis, setUsageBasis] = useState<"vma" | "ld">("vma");
+    const [msgApi, contextHolder] = message.useMessage();
     const toggleUsedUnit = () => setShowUsedBytes((prev) => !prev);
     const usageNoteKey = usageBasis === "ld" ? "dashRegionsUsageNoteLd" : "dashRegionsUsageNoteVma";
     const totals = result?.summary.sections_totals;
     const symbols = result?.summary.top_symbols ?? [];
     const regions = result?.summary.memory_regions ?? [];
     const cacheHit = result?.meta.cache?.hit ?? false;
+    const hasToolchain = Boolean(
+        toolchain.toolchainRoot || toolchain.nmPath || toolchain.objdumpPath || toolchain.stringsPath,
+    );
 
     const flashBase = totals?.flash_region_bytes ?? totals?.flash_bytes ?? 0;
     const ramBase = totals?.ram_region_bytes ?? totals?.ram_bytes ?? 0;
@@ -82,6 +95,91 @@ export default function DashboardPage() {
         if (lower.includes("flash") || lower.includes("rom")) return estimatedFlashUsed;
         if (lower.includes("ram") || lower.includes("sram")) return estimatedRamUsed;
         return 0;
+    };
+
+    const detectToolchain = async (notify: boolean) => {
+        try {
+            const candidates = await invoke<ToolchainCandidate[]>("detect_toolchain", {
+                config: {
+                    auto_detect: toolchain.autoDetect,
+                    toolchain_root: toolchain.toolchainRoot || null,
+                    nm_path: toolchain.nmPath || null,
+                    objdump_path: toolchain.objdumpPath || null,
+                    strings_path: toolchain.stringsPath || null,
+                },
+            });
+            if (!candidates || candidates.length === 0) {
+                if (notify) {
+                    msgApi.warning(uiText(language, "toolchainDetectFailed"));
+                }
+                return false;
+            }
+            const candidate = candidates[0];
+            const derivedRoot = deriveRootFromNm(candidate.paths.nm_path);
+            updateToolchain({
+                toolchainRoot: derivedRoot || toolchain.toolchainRoot,
+                nmPath: candidate.paths.nm_path,
+                objdumpPath: candidate.paths.objdump_path,
+                stringsPath: candidate.paths.strings_path,
+                lastDetected: candidate.source,
+            });
+            if (notify) {
+                msgApi.success(uiText(language, "toolchainDetectSuccess"));
+            }
+            return true;
+        } catch (error: unknown) {
+            if (notify) {
+                const messageText = error instanceof Error ? error.message : String(error);
+                msgApi.error(messageText);
+            }
+            return false;
+        }
+    };
+
+    const runWithCurrentInputs = async () => {
+        if (!inputs.elfPath) {
+            msgApi.info(uiText(language, "analysisMissingElf"));
+            return;
+        }
+
+        if (toolchain.autoDetect && !hasToolchain) {
+            const detected = await detectToolchain(false);
+            if (!detected) {
+                msgApi.warning(uiText(language, "analysisNeedToolchain"));
+                return;
+            }
+        }
+
+        if (!toolchain.autoDetect && !hasToolchain) {
+            msgApi.warning(uiText(language, "analysisNeedToolchain"));
+            return;
+        }
+
+        setStatus("running");
+        msgApi.loading(uiText(language, "analysisStart"), 0.8);
+
+        const params: AnalyzeParams = {
+            elf_path: inputs.elfPath,
+            map_path: inputs.mapPath || null,
+            toolchain: {
+                auto_detect: toolchain.autoDetect,
+                toolchain_root: toolchain.toolchainRoot || null,
+                nm_path: toolchain.nmPath || null,
+                objdump_path: toolchain.objdumpPath || null,
+                strings_path: toolchain.stringsPath || null,
+            },
+        };
+
+        try {
+            const analysisResult = await invoke<AnalysisResult>("analyze_firmware", { params });
+            setResult(analysisResult);
+            setStatus("success");
+            msgApi.success(uiText(language, "analysisStart"));
+        } catch (error: unknown) {
+            const messageText = error instanceof Error ? error.message : String(error);
+            setStatus("error", messageText);
+            msgApi.error(uiText(language, "analysisFailed", { msg: messageText }));
+        }
     };
 
     const regionColumns = [
@@ -181,154 +279,178 @@ export default function DashboardPage() {
         },
     ];
 
+    const canRunCurrent = Boolean(inputs.elfPath) && status !== "running";
+
     return (
-        <Space direction="vertical" size="large" className="pageStack">
-            <Row gutter={[16, 16]}>
-                <Col xs={24} lg={12}>
-                    <Card className="pageCard riseIn" style={{ animationDelay: "120ms" }}>
-                        <Typography.Title level={4}>{uiText(language, "dashInputTitle")}</Typography.Title>
-                        <Typography.Text type="secondary">{uiText(language, "dashInputHint")}</Typography.Text>
-                        <Divider />
-                        <Space direction="vertical" size="small" className="pathList">
-                            <div className="pathRow">
-                                <Typography.Text strong>{uiText(language, "analysisElfLabel")}</Typography.Text>
-                                <Typography.Text className="pathValue">
-                                    {inputs.elfPath || uiText(language, "analysisNotSet")}
-                                </Typography.Text>
-                            </div>
-                            <div className="pathRow">
-                                <Typography.Text strong>{uiText(language, "analysisMapLabel")}</Typography.Text>
-                                <Typography.Text className="pathValue">
-                                    {inputs.mapPath || uiText(language, "analysisNotSet")}
-                                </Typography.Text>
-                            </div>
-                        </Space>
-                    </Card>
-                </Col>
-                <Col xs={24} lg={12}>
-                    <Card className="pageCard riseIn" style={{ animationDelay: "140ms" }}>
-                        <Typography.Title level={4}>{uiText(language, "analysisStatusTitle")}</Typography.Title>
-                        <Typography.Text type="secondary">
-                            {uiText(language, "analysisStatusDetail", { status: statusLabel })}
-                        </Typography.Text>
-                        <Divider />
-                        <Space direction="vertical" size="small">
-                            <Tag color={statusColor(status)} className="statusTag">
-                                {statusLabel}
-                            </Tag>
-                            <Typography.Text type="secondary">
-                                {status === "idle"
-                                    ? uiText(language, "analysisStatusNone")
-                                    : status === "error" && lastError
-                                        ? lastError
-                                        : ""}
-                            </Typography.Text>
-                            {result ? (
-                                <Tag color={cacheHit ? "green" : "default"}>
-                                    {cacheHit ? uiText(language, "analysisCacheHit") : uiText(language, "analysisCacheMiss")}
-                                </Tag>
-                            ) : null}
-                        </Space>
-                    </Card>
-                </Col>
-            </Row>
+        <>
+            {contextHolder}
+            <Space direction="vertical" size="large" className="pageStack">
+                                <Row gutter={[16, 16]} align="stretch">
+                    <Col xs={24} lg={14}>
+                        <Card className="pageCard riseIn" style={{ animationDelay: "120ms", height: "100%" }}>
+                                                    <Space align="center" style={{ width: "100%", justifyContent: "space-between" }}>
+                                                        <div>
+                                                            <Typography.Title level={4}>{uiText(language, "dashInputTitle")}</Typography.Title>
+                                                            <Typography.Text type="secondary">{uiText(language, "dashInputHint")}</Typography.Text>
+                                                        </div>
+                                                        <Space direction="vertical" size={4} align="end">
+                                                            <Button
+                                                                type="primary"
+                                                                onClick={runWithCurrentInputs}
+                                                                disabled={!canRunCurrent}
+                                                                loading={status === "running"}
+                                                            >
+                                                                {uiText(language, "analysisRunCurrent")}
+                                                            </Button>
+                                                            <Space size="small" align="center" wrap>
+                                                                <Typography.Text type="secondary">
+                                                                    {uiText(language, "analysisStatusDetail", { status: statusLabel })}
+                                                                </Typography.Text>
+                                                                <Tag color={statusColor(status)} className="statusTag">
+                                                                    {statusLabel}
+                                                                </Tag>
+                                                                {result ? (
+                                                                    <Tag color={cacheHit ? "green" : "default"}>
+                                                                        {cacheHit
+                                                                            ? uiText(language, "analysisCacheHit")
+                                                                            : uiText(language, "analysisCacheMiss")}
+                                                                    </Tag>
+                                                                ) : null}
+                                                            </Space>
+                                                            {status === "idle" ? (
+                                                                <Typography.Text type="secondary">{uiText(language, "analysisStatusNone")}</Typography.Text>
+                                                            ) : null}
+                                                            {status === "error" && lastError ? (
+                                                                <Typography.Text type="danger">{lastError}</Typography.Text>
+                                                            ) : null}
+                                                        </Space>
+                                                    </Space>
+                                                    <Divider />
+                                                    <Space direction="vertical" size="small" className="pathList">
+                                                        <div className="pathRow">
+                                                            <Typography.Text strong>{uiText(language, "analysisElfLabel")}</Typography.Text>
+                                                            <Typography.Text className="pathValue">
+                                                                {inputs.elfPath || uiText(language, "analysisNotSet")}
+                                                            </Typography.Text>
+                                                        </div>
+                                                        <div className="pathRow">
+                                                            <Typography.Text strong>{uiText(language, "analysisMapLabel")}</Typography.Text>
+                                                            <Typography.Text className="pathValue">
+                                                                {inputs.mapPath || uiText(language, "analysisNotSet")}
+                                                            </Typography.Text>
+                                                        </div>
+                                                    </Space>
+                                                </Card>
+                    </Col>
+                    <Col xs={24} lg={10}>
+                        <Card className="pageCard riseIn" style={{ animationDelay: "280ms", height: "100%" }}>
+                                                    <Typography.Title level={4}>{uiText(language, "dashSectionFootprintTitle")}</Typography.Title>
+                                                    <Typography.Text type="secondary">
+                                                        {uiText(language, "dashSectionFootprintHint")}
+                                                    </Typography.Text>
+                                                    <Divider />
+                                                    <Space direction="vertical" size="small" className="progressStack">
+                                                        <div className="progressRow">
+                                                            <span>.text {formatBytes(totals?.text_bytes ?? null)}</span>
+                                                            <Progress
+                                                                percent={
+                                                                    totals?.text_bytes
+                                                                        ? Number(((totals.text_bytes / (flashBase || 1)) * 100).toFixed(1))
+                                                                        : 0
+                                                                }
+                                                                showInfo
+                                                            />
+                                                        </div>
+                                                        <div className="progressRow">
+                                                            <span>.rodata {formatBytes(totals?.rodata_bytes ?? null)}</span>
+                                                            <Progress
+                                                                percent={
+                                                                    totals?.rodata_bytes
+                                                                        ? Number(((totals.rodata_bytes / (flashBase || 1)) * 100).toFixed(1))
+                                                                        : 0
+                                                                }
+                                                                showInfo
+                                                            />
+                                                        </div>
+                                                        <div className="progressRow">
+                                                            <span>.data {formatBytes(totals?.data_bytes ?? null)}</span>
+                                                            <Progress
+                                                                percent={
+                                                                    totals?.data_bytes
+                                                                        ? Number(((totals.data_bytes / (flashBase || 1)) * 100).toFixed(1))
+                                                                        : 0
+                                                                }
+                                                                showInfo
+                                                            />
+                                                        </div>
+                                                        <div className="progressRow">
+                                                            <span>.bss {formatBytes(totals?.bss_bytes ?? null)}</span>
+                                                            <Progress
+                                                                percent={
+                                                                    totals?.bss_bytes
+                                                                        ? Number(((totals.bss_bytes / (ramBase || 1)) * 100).toFixed(1))
+                                                                        : 0
+                                                                }
+                                                                showInfo
+                                                            />
+                                                        </div>
+                                                    </Space>
+                                                </Card>
+                    </Col>
+                </Row>
 
-            <Card className="pageCard riseIn" style={{ animationDelay: "260ms" }}>
-                <Space size="small" align="center" wrap>
-                    <Typography.Title level={4}>{uiText(language, "dashRegionsTitle")}</Typography.Title>
-                    <Tooltip title={uiText(language, usageNoteKey)}>
-                        <InfoCircleOutlined style={{ color: "rgba(0, 0, 0, 0.45)" }} />
-                    </Tooltip>
-                    <Space size="small" align="center">
-                        <Typography.Text type="secondary">{uiText(language, "dashRegionsBasisLabel")}</Typography.Text>
-                        <Segmented
-                            size="small"
-                            value={usageBasis}
-                            onChange={(value) => setUsageBasis(value as "vma" | "ld")}
-                            options={[
-                                { label: uiText(language, "dashRegionsBasisVma"), value: "vma" },
-                                { label: uiText(language, "dashRegionsBasisLd"), value: "ld" },
-                            ]}
-                        />
-                    </Space>
-                </Space>
-                <Typography.Text type="secondary">{uiText(language, "dashRegionsHint")}</Typography.Text>
-                <Divider />
-                <Table
-                    columns={regionColumns}
-                    dataSource={regions}
-                    rowKey={(row) => row.name}
-                    pagination={false}
-                    locale={{ emptyText: <Empty description={uiText(language, "objectsMapEmpty")} /> }}
-                />
-            </Card>
+                <Row gutter={[16, 16]}>
+                    <Col xs={24} lg={24}>
+                        <Card className="pageCard riseIn" style={{ animationDelay: "260ms" }}>
+                            <Space size="small" align="center" wrap>
+                                <Typography.Title level={4}>{uiText(language, "dashRegionsTitle")}</Typography.Title>
+                                <Tooltip title={uiText(language, usageNoteKey)}>
+                                    <InfoCircleOutlined style={{ color: "rgba(0, 0, 0, 0.45)" }} />
+                                </Tooltip>
+                                <Space size="small" align="center">
+                                    <Typography.Text type="secondary">{uiText(language, "dashRegionsBasisLabel")}</Typography.Text>
+                                    <Segmented
+                                        size="small"
+                                        value={usageBasis}
+                                        onChange={(value) => setUsageBasis(value as "vma" | "ld")}
+                                        options={[
+                                            { label: uiText(language, "dashRegionsBasisVma"), value: "vma" },
+                                            { label: uiText(language, "dashRegionsBasisLd"), value: "ld" },
+                                        ]}
+                                    />
+                                </Space>
+                            </Space>
+                            <Typography.Text type="secondary">{uiText(language, "dashRegionsHint")}</Typography.Text>
+                            <Divider />
+                            <Table
+                                columns={regionColumns}
+                                dataSource={regions}
+                                rowKey={(row) => row.name}
+                                pagination={false}
+                                size="small"
+                                locale={{ emptyText: <Empty description={uiText(language, "objectsMapEmpty")} /> }}
+                            />
+                        </Card>
+                    </Col>
+                </Row>
 
-            <Row gutter={[16, 16]}>
-                <Col xs={24} lg={14}>
-                    <Card className="pageCard riseIn" style={{ animationDelay: "180ms" }}>
-                        <Typography.Title level={4}>
-                            {uiText(language, "dashSectionFootprintTitle")}
-                        </Typography.Title>
-                        <Typography.Text type="secondary">
-                            {uiText(language, "dashSectionFootprintHint")}
-                        </Typography.Text>
-                        <Divider />
-                        <Space direction="vertical" size="small" className="progressStack">
-                            <div className="progressRow">
-                                <span>.text {formatBytes(totals?.text_bytes ?? null)}</span>
-                                <Progress
-                                    percent={
-                                        totals?.text_bytes ? Number(((totals.text_bytes / (flashBase || 1)) * 100).toFixed(1)) : 0
-                                    }
-                                    showInfo
-                                />
-                            </div>
-                            <div className="progressRow">
-                                <span>.rodata {formatBytes(totals?.rodata_bytes ?? null)}</span>
-                                <Progress
-                                    percent={
-                                        totals?.rodata_bytes ? Number(((totals.rodata_bytes / (flashBase || 1)) * 100).toFixed(1)) : 0
-                                    }
-                                    showInfo
-                                />
-                            </div>
-                            <div className="progressRow">
-                                <span>.data {formatBytes(totals?.data_bytes ?? null)}</span>
-                                <Progress
-                                    percent={
-                                        totals?.data_bytes ? Number(((totals.data_bytes / (flashBase || 1)) * 100).toFixed(1)) : 0
-                                    }
-                                    showInfo
-                                />
-                            </div>
-                            <div className="progressRow">
-                                <span>.bss {formatBytes(totals?.bss_bytes ?? null)}</span>
-                                <Progress
-                                    percent={
-                                        totals?.bss_bytes ? Number(((totals.bss_bytes / (ramBase || 1)) * 100).toFixed(1)) : 0
-                                    }
-                                    showInfo
-                                />
-                            </div>
-                        </Space>
-                    </Card>
-                </Col>
-                <Col xs={24} lg={10}>
-                    <Card className="pageCard riseIn" style={{ animationDelay: "220ms" }}>
-                        <Typography.Title level={4}>{uiText(language, "dashTopSymbolsTitle")}</Typography.Title>
-                        <Typography.Text type="secondary">{uiText(language, "dashTopSymbolsHint")}</Typography.Text>
-                        <Divider />
-                        <Table
-                            columns={topSymbolColumns}
-                            dataSource={symbols}
-                            rowKey={(row) => row.name}
-                            pagination={false}
-                            locale={{ emptyText: <Empty description={uiText(language, "dashTopSymbolsEmpty")} /> }}
-                        />
-                    </Card>
-                </Col>
-            </Row>
-        </Space>
+                <Row gutter={[16, 16]}>
+                    <Col xs={24} lg={24}>
+                        <Card className="pageCard riseIn" style={{ animationDelay: "320ms" }}>
+                            <Typography.Title level={4}>{uiText(language, "dashTopSymbolsTitle")}</Typography.Title>
+                            <Typography.Text type="secondary">{uiText(language, "dashTopSymbolsHint")}</Typography.Text>
+                            <Divider />
+                            <Table
+                                columns={topSymbolColumns}
+                                dataSource={symbols}
+                                rowKey={(row) => row.name}
+                                pagination={false}
+                                locale={{ emptyText: <Empty description={uiText(language, "dashTopSymbolsEmpty")} /> }}
+                            />
+                        </Card>
+                    </Col>
+                </Row>
+            </Space>
+        </>
     );
 }
-
