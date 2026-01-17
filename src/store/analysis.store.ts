@@ -42,6 +42,7 @@ type MemoryRegion = {
     length: number;
     used?: number | null;
     padding_bytes?: number | null;
+    sources?: { name: string; size: number }[];
 };
 
 type Finding = {

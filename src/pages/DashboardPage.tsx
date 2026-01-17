@@ -85,7 +85,37 @@ export default function DashboardPage() {
     };
 
     const regionColumns = [
-        { title: uiText(language, "dashRegionName"), dataIndex: "name", key: "name" },
+        {
+            title: uiText(language, "dashRegionName"),
+            dataIndex: "name",
+            key: "name",
+            render: (value: string, record: { sources?: { name: string; size: number }[] }) => {
+                const isDefault = String(value).toLowerCase().includes("default");
+                if (!isDefault) return value;
+                const sources = record.sources ?? [];
+                const sourcesLabel = sources.length
+                    ? sources.map((item) => `${item.name} (${formatBytes(item.size)})`).join("\n")
+                    : uiText(language, "dashNoData");
+                return (
+                    <Space size="small">
+                        <span>{value}</span>
+                        <Tooltip
+                            title={
+                                <Space direction="vertical" size={4}>
+                                    <Typography.Text>{uiText(language, "dashRegionDefaultHint")}</Typography.Text>
+                                    <Typography.Text className="tooltipMuted">
+                                        {uiText(language, "dashRegionDefaultSources")}
+                                    </Typography.Text>
+                                    <Typography.Text style={{ whiteSpace: "pre-line" }}>{sourcesLabel}</Typography.Text>
+                                </Space>
+                            }
+                        >
+                            <Tag>{uiText(language, "dashRegionDefaultTag")}</Tag>
+                        </Tooltip>
+                    </Space>
+                );
+            },
+        },
         { title: uiText(language, "dashRegionOrigin"), dataIndex: "origin", key: "origin" },
         {
             title: uiText(language, "dashRegionLength"),

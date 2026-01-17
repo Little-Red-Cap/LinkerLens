@@ -90,6 +90,9 @@ export type UiKey =
     | "dashRegionOrigin"
     | "dashRegionLength"
     | "dashRegionUsed"
+    | "dashRegionDefaultTag"
+    | "dashRegionDefaultHint"
+    | "dashRegionDefaultSources"
     | "symbolsSearchPlaceholder"
     | "symbolsSectionPlaceholder"
     | "symbolsTypePlaceholder"
@@ -221,6 +224,9 @@ const zh: Record<UiKey, string> = {
     dashRegionOrigin: "起始",
     dashRegionLength: "长度",
     dashRegionUsed: "已用",
+    dashRegionDefaultTag: "默认区域",
+    dashRegionDefaultHint: "链接器兜底区域：未显式归属到 RAM/FLASH 的段会落在这里。",
+    dashRegionDefaultSources: "占用来源",
     symbolsSearchPlaceholder: "搜索符号名或正则",
     symbolsSectionPlaceholder: "段",
     symbolsTypePlaceholder: "类型",
@@ -353,6 +359,9 @@ const en: Record<UiKey, string> = {
     dashRegionOrigin: "Origin",
     dashRegionLength: "Length",
     dashRegionUsed: "Used",
+    dashRegionDefaultTag: "Default",
+    dashRegionDefaultHint: "Linker fallback region for sections not mapped to RAM/FLASH.",
+    dashRegionDefaultSources: "Sources",
     symbolsSearchPlaceholder: "Search symbol name or regex",
     symbolsSectionPlaceholder: "Section",
     symbolsTypePlaceholder: "Type",
