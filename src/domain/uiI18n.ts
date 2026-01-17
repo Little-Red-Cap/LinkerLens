@@ -104,6 +104,7 @@ export type UiKey =
     | "symbolsColumnSize"
     | "symbolsColumnType"
     | "symbolsColumnSection"
+    | "symbolsColumnAddress"
     | "symbolsAbsoluteNote"
     | "symbolsNoSizeNote"
     | "symbolsDetailTitle"
@@ -247,6 +248,7 @@ const zh: Record<UiKey, string> = {
     symbolsColumnSize: "大小",
     symbolsColumnType: "类型",
     symbolsColumnSection: "段",
+    symbolsColumnAddress: "地址",
     symbolsAbsoluteNote: "绝对符号，无大小",
     symbolsNoSizeNote: "该符号无有效大小",
     symbolsDetailTitle: "符号详情",
@@ -391,6 +393,7 @@ const en: Record<UiKey, string> = {
     symbolsColumnSize: "Size",
     symbolsColumnType: "Type",
     symbolsColumnSection: "Section",
+    symbolsColumnAddress: "Address",
     symbolsAbsoluteNote: "Absolute symbol, no size",
     symbolsNoSizeNote: "Symbol has no meaningful size",
     symbolsDetailTitle: "Symbol Details",

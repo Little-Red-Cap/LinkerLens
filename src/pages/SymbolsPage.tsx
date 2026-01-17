@@ -93,6 +93,13 @@ export default function SymbolsPage() {
             sortOrder: sortKey === "kind" ? (sortOrder === "asc" ? "ascend" : "descend") : undefined,
         },
         {
+            title: uiText(language, "symbolsColumnAddress"),
+            dataIndex: "addr",
+            key: "addr",
+            width: 150,
+            render: (value?: string) => (value ? `0x${value}` : "--"),
+        },
+        {
             title: uiText(language, "symbolsColumnSection"),
             dataIndex: "section_guess",
             key: "section",
@@ -222,6 +229,7 @@ export default function SymbolsPage() {
                     loading={loading}
                     tableLayout="fixed"
                     className="symbolsTable"
+                    scroll={{ x: 980 }}
                     onChange={(_, __, sorter) => {
                         if (Array.isArray(sorter)) return;
                         const nextOrder = sorter.order === "ascend" ? "asc" : "desc";

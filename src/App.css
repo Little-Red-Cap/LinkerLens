@@ -212,6 +212,16 @@
   white-space: nowrap;
 }
 
+.symbolsTable .ant-table-thead > tr > th,
+.symbolsTable .ant-table-tbody > tr > td {
+  border-inline-end: 1px solid var(--border);
+}
+
+.symbolsTable .ant-table-thead > tr > th:last-child,
+.symbolsTable .ant-table-tbody > tr > td:last-child {
+  border-inline-end: none;
+}
+
 .cardHint {
   display: block;
   margin-top: 6px;
