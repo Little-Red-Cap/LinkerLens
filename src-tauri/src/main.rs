@@ -22,6 +22,7 @@ fn main() {
             toolchain::detect_toolchain,
             analyzer::analyze_firmware,
             analyzer::list_symbols,
+            analyzer::list_symbol_facets,
             analyzer::lookup_pc
         ])
         .run(tauri::generate_context!())

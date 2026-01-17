@@ -217,12 +217,26 @@ pub struct SymbolQuery {
     pub page_size: usize,
     pub sort: Option<String>,
     pub order: Option<String>,
+    pub section: Option<String>,
+    pub kind: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PagedSymbols {
     pub total: usize,
     pub items: Vec<SymbolInfo>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct FacetItem {
+    pub value: String,
+    pub count: usize,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SymbolFacets {
+    pub sections: Vec<FacetItem>,
+    pub kinds: Vec<FacetItem>,
 }
 
 #[tauri::command]
@@ -242,6 +256,16 @@ pub fn list_symbols(state: tauri::State<'_, AppState>, query: SymbolQuery) -> Re
                 let needle = q.trim().to_ascii_lowercase();
                 symbol.name.to_ascii_lowercase().contains(&needle)
             }
+            _ => true,
+        })
+        .filter(|symbol| match query.section.as_ref() {
+            Some(section) if !section.trim().is_empty() => {
+                symbol.section_guess.eq_ignore_ascii_case(section.trim())
+            }
+            _ => true,
+        })
+        .filter(|symbol| match query.kind.as_ref() {
+            Some(kind) if !kind.trim().is_empty() => symbol.kind.eq_ignore_ascii_case(kind.trim()),
             _ => true,
         })
         .cloned()
@@ -272,6 +296,43 @@ pub fn list_symbols(state: tauri::State<'_, AppState>, query: SymbolQuery) -> Re
     };
 
     Ok(PagedSymbols { total, items: paged })
+}
+
+#[tauri::command]
+pub fn list_symbol_facets(state: tauri::State<'_, AppState>) -> Result<SymbolFacets, String> {
+    let data = state.symbols.lock().map_err(|_| "Failed to read symbols cache.".to_string())?;
+    if data.is_empty() {
+        return Ok(SymbolFacets {
+            sections: Vec::new(),
+            kinds: Vec::new(),
+        });
+    }
+
+    let mut section_counts: std::collections::HashMap<String, usize> = std::collections::HashMap::new();
+    let mut kind_counts: std::collections::HashMap<String, usize> = std::collections::HashMap::new();
+
+    for symbol in data.iter() {
+        if !symbol.section_guess.trim().is_empty() {
+            *section_counts.entry(symbol.section_guess.clone()).or_insert(0) += 1;
+        }
+        if !symbol.kind.trim().is_empty() {
+            *kind_counts.entry(symbol.kind.clone()).or_insert(0) += 1;
+        }
+    }
+
+    let mut sections: Vec<FacetItem> = section_counts
+        .into_iter()
+        .map(|(value, count)| FacetItem { value, count })
+        .collect();
+    sections.sort_by(|a, b| b.count.cmp(&a.count).then_with(|| a.value.cmp(&b.value)));
+
+    let mut kinds: Vec<FacetItem> = kind_counts
+        .into_iter()
+        .map(|(value, count)| FacetItem { value, count })
+        .collect();
+    kinds.sort_by(|a, b| b.count.cmp(&a.count).then_with(|| a.value.cmp(&b.value)));
+
+    Ok(SymbolFacets { sections, kinds })
 }
 
 #[tauri::command]

@@ -26,6 +26,16 @@ type PagedSymbols = {
     items: SymbolInfo[];
 };
 
+type FacetItem = {
+    value: string;
+    count: number;
+};
+
+type SymbolFacets = {
+    sections: FacetItem[];
+    kinds: FacetItem[];
+};
+
 export default function SymbolsPage() {
     const language = useUiStore((s) => s.language);
     const analysisStatus = useAnalysisStore((s) => s.status);
@@ -38,6 +48,10 @@ export default function SymbolsPage() {
     const [loading, setLoading] = useState(false);
     const [sortKey, setSortKey] = useState<"size" | "name" | "kind" | "section_guess">("size");
     const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
+    const [sectionFilter, setSectionFilter] = useState<string | null>(null);
+    const [typeFilter, setTypeFilter] = useState<string | null>(null);
+    const [facets, setFacets] = useState<SymbolFacets>({ sections: [], kinds: [] });
+    const [facetLoading, setFacetLoading] = useState(false);
 
     const columns = [
         {
@@ -99,21 +113,40 @@ export default function SymbolsPage() {
             try {
                 const result = await invoke<PagedSymbols>("list_symbols", {
                     query: {
-                        query: search || null,
-                        page,
-                        page_size: pageSize,
-                        sort: sortKey,
-                        order: sortOrder,
-                    },
-                });
-                setData(result.items || []);
-                setTotal(result.total || 0);
+                    query: search || null,
+                    page,
+                    page_size: pageSize,
+                    sort: sortKey,
+                    order: sortOrder,
+                    section: sectionFilter,
+                    kind: typeFilter,
+                },
+            });
+            setData(result.items || []);
+            setTotal(result.total || 0);
             } finally {
                 setLoading(false);
             }
         };
         load();
-    }, [analysisStatus, page, pageSize, search, sortKey, sortOrder]);
+    }, [analysisStatus, page, pageSize, search, sortKey, sortOrder, sectionFilter, typeFilter]);
+
+    useEffect(() => {
+        const loadFacets = async () => {
+            if (analysisStatus !== "success") {
+                setFacets({ sections: [], kinds: [] });
+                return;
+            }
+            setFacetLoading(true);
+            try {
+                const result = await invoke<SymbolFacets>("list_symbol_facets");
+                setFacets(result);
+            } finally {
+                setFacetLoading(false);
+            }
+        };
+        loadFacets();
+    }, [analysisStatus]);
 
     const onSearch = () => {
         setPage(1);
@@ -136,19 +169,35 @@ export default function SymbolsPage() {
                     <Col xs={12} md={4}>
                         <Select
                             placeholder={uiText(language, "symbolsSectionPlaceholder")}
-                            options={[]}
+                            options={facets.sections.map((item) => ({
+                                label: `${item.value} (${item.count})`,
+                                value: item.value,
+                            }))}
                             allowClear
                             style={{ width: "100%" }}
-                            disabled
+                            loading={facetLoading}
+                            value={sectionFilter ?? undefined}
+                            onChange={(value) => {
+                                setSectionFilter(value ?? null);
+                                setPage(1);
+                            }}
                         />
                     </Col>
                     <Col xs={12} md={4}>
                         <Select
                             placeholder={uiText(language, "symbolsTypePlaceholder")}
-                            options={[]}
+                            options={facets.kinds.map((item) => ({
+                                label: `${item.value} (${item.count})`,
+                                value: item.value,
+                            }))}
                             allowClear
                             style={{ width: "100%" }}
-                            disabled
+                            loading={facetLoading}
+                            value={typeFilter ?? undefined}
+                            onChange={(value) => {
+                                setTypeFilter(value ?? null);
+                                setPage(1);
+                            }}
                         />
                     </Col>
                     <Col xs={24} md={6}>
