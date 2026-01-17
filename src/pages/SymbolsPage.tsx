@@ -1,6 +1,7 @@
 ﻿import { Button, Card, Col, Descriptions, Drawer, Input, Row, Select, Space, Table, Tooltip, Typography } from "antd";
+import type { ColumnsType } from "antd/es/table";
 import { invoke } from "@tauri-apps/api/core";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { uiText } from "../domain/uiI18n";
 import { useAnalysisStore } from "../store/analysis.store";
 import { useUiStore } from "../store/ui.store";
@@ -54,61 +55,64 @@ export default function SymbolsPage() {
     const [facetLoading, setFacetLoading] = useState(false);
     const [selectedSymbol, setSelectedSymbol] = useState<SymbolInfo | null>(null);
 
-    const columns = [
-        {
-            title: uiText(language, "symbolsColumnSymbol"),
-            dataIndex: "name",
-            key: "name",
-            ellipsis: true,
-            width: 360,
-            sorter: true,
-            sortOrder: sortKey === "name" ? (sortOrder === "asc" ? "ascend" : "descend") : undefined,
-        },
-        {
-            title: uiText(language, "symbolsColumnSize"),
-            dataIndex: "size",
-            key: "size",
-            width: 120,
-            render: (value: number, record: SymbolInfo) => {
-                if (value === 0) {
-                    const kind = record.kind?.toLowerCase();
-                    const noteKey = kind === "a" ? "symbolsAbsoluteNote" : "symbolsNoSizeNote";
-                    return (
-                        <Tooltip title={uiText(language, noteKey)}>
-                            <Typography.Text type="secondary">--</Typography.Text>
-                        </Tooltip>
-                    );
-                }
-                return formatBytes(value);
+    const columns: ColumnsType<SymbolInfo> = useMemo(
+        () => [
+            {
+                title: uiText(language, "symbolsColumnSymbol"),
+                dataIndex: "name",
+                key: "name",
+                ellipsis: true,
+                width: 360,
+                sorter: true,
+                sortOrder: sortKey === "name" ? (sortOrder === "asc" ? "ascend" : "descend") : undefined,
             },
-            sorter: true,
-            sortOrder: sortKey === "size" ? (sortOrder === "asc" ? "ascend" : "descend") : undefined,
-        },
-        {
-            title: uiText(language, "symbolsColumnType"),
-            dataIndex: "kind",
-            key: "type",
-            width: 90,
-            sorter: true,
-            sortOrder: sortKey === "kind" ? (sortOrder === "asc" ? "ascend" : "descend") : undefined,
-        },
-        {
-            title: uiText(language, "symbolsColumnAddress"),
-            dataIndex: "addr",
-            key: "addr",
-            width: 150,
-            render: (value?: string) => (value ? `0x${value}` : "--"),
-        },
-        {
-            title: uiText(language, "symbolsColumnSection"),
-            dataIndex: "section_guess",
-            key: "section",
-            ellipsis: true,
-            width: 140,
-            sorter: true,
-            sortOrder: sortKey === "section_guess" ? (sortOrder === "asc" ? "ascend" : "descend") : undefined,
-        },
-    ];
+            {
+                title: uiText(language, "symbolsColumnSize"),
+                dataIndex: "size",
+                key: "size",
+                width: 120,
+                render: (value: number, record: SymbolInfo) => {
+                    if (value === 0) {
+                        const kind = record.kind?.toLowerCase();
+                        const noteKey = kind === "a" ? "symbolsAbsoluteNote" : "symbolsNoSizeNote";
+                        return (
+                            <Tooltip title={uiText(language, noteKey)}>
+                                <Typography.Text type="secondary">--</Typography.Text>
+                            </Tooltip>
+                        );
+                    }
+                    return formatBytes(value);
+                },
+                sorter: true,
+                sortOrder: sortKey === "size" ? (sortOrder === "asc" ? "ascend" : "descend") : undefined,
+            },
+            {
+                title: uiText(language, "symbolsColumnType"),
+                dataIndex: "kind",
+                key: "type",
+                width: 90,
+                sorter: true,
+                sortOrder: sortKey === "kind" ? (sortOrder === "asc" ? "ascend" : "descend") : undefined,
+            },
+            {
+                title: uiText(language, "symbolsColumnAddress"),
+                dataIndex: "addr",
+                key: "addr",
+                width: 150,
+                render: (value?: string) => (value ? `0x${value}` : "--"),
+            },
+            {
+                title: uiText(language, "symbolsColumnSection"),
+                dataIndex: "section_guess",
+                key: "section",
+                ellipsis: true,
+                width: 140,
+                sorter: true,
+                sortOrder: sortKey === "section_guess" ? (sortOrder === "asc" ? "ascend" : "descend") : undefined,
+            },
+        ],
+        [language, sortKey, sortOrder],
+    );
 
     useEffect(() => {
         const load = async () => {
@@ -229,7 +233,7 @@ export default function SymbolsPage() {
                     loading={loading}
                     tableLayout="fixed"
                     className="symbolsTable"
-                    scroll={{ x: 980 }}
+                    scroll={{ x: "max-content" }}
                     onChange={(_, __, sorter) => {
                         if (Array.isArray(sorter)) return;
                         const nextOrder = sorter.order === "ascend" ? "asc" : "desc";

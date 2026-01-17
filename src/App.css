@@ -206,10 +206,16 @@
 
 .symbolsTable .ant-table {
   table-layout: fixed;
+  width: 100%;
+  min-width: 100%;
 }
 
 .symbolsTable .ant-table-cell {
   white-space: nowrap;
+}
+
+.symbolsTable .ant-table-container {
+  overflow-x: auto;
 }
 
 .symbolsTable .ant-table-thead > tr > th,
@@ -377,3 +383,4 @@
     gap: 8px;
   }
 }
+
