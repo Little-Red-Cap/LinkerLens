@@ -1,4 +1,5 @@
 ﻿import { Card, Col, Divider, Empty, Progress, Row, Space, Table, Tag, Typography } from "antd";
+import { useState } from "react";
 import { uiText } from "../domain/uiI18n";
 import { useAnalysisStore } from "../store/analysis.store";
 import { useUiStore } from "../store/ui.store";
@@ -31,6 +32,7 @@ export default function DashboardPage() {
     const result = useAnalysisStore((s) => s.result);
     const status = useAnalysisStore((s) => s.status);
     const lastError = useAnalysisStore((s) => s.lastError);
+    const [showUsedBytes, setShowUsedBytes] = useState(false);
     const totals = result?.summary.sections_totals;
     const symbols = result?.summary.top_symbols ?? [];
     const regions = result?.summary.memory_regions ?? [];
@@ -101,6 +103,8 @@ export default function DashboardPage() {
                 }
                 const percent = record.length > 0 ? Math.min(100, (usedValue / record.length) * 100) : 0;
                 const over = usedValue > record.length;
+                const usedLabel = showUsedBytes ? `${usedValue} B` : formatBytes(usedValue);
+                const lengthLabel = showUsedBytes ? `${record.length} B` : formatBytes(record.length);
                 return (
                     <Space direction="vertical" size={4}>
                         <Progress
@@ -109,8 +113,12 @@ export default function DashboardPage() {
                             status={over ? "exception" : "normal"}
                             showInfo
                         />
-                        <Typography.Text type={over ? "danger" : "secondary"}>
-                            {formatBytes(usedValue)} / {formatBytes(record.length)}
+                        <Typography.Text
+                            type={over ? "danger" : "secondary"}
+                            style={{ cursor: "pointer" }}
+                            onClick={() => setShowUsedBytes((prev) => !prev)}
+                        >
+                            {usedLabel} / {lengthLabel}
                         </Typography.Text>
                     </Space>
                 );

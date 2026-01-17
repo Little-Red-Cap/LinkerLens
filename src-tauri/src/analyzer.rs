@@ -410,12 +410,15 @@ fn compute_section_totals(sections: &[SectionInfo]) -> SectionTotals {
         ram_region_bytes: None,
     };
     for section in sections {
-        match section.name.as_str() {
-            ".text" => totals.text_bytes += section.size,
-            ".rodata" => totals.rodata_bytes += section.size,
-            ".data" => totals.data_bytes += section.size,
-            ".bss" => totals.bss_bytes += section.size,
-            _ => {}
+        let name = section.name.as_str();
+        if name == ".text" || name.starts_with(".text.") {
+            totals.text_bytes += section.size;
+        } else if name == ".rodata" || name.starts_with(".rodata.") {
+            totals.rodata_bytes += section.size;
+        } else if name == ".data" || name.starts_with(".data.") {
+            totals.data_bytes += section.size;
+        } else if name == ".bss" || name.starts_with(".bss.") {
+            totals.bss_bytes += section.size;
         }
     }
     totals.flash_bytes = totals.text_bytes + totals.rodata_bytes + totals.data_bytes;
@@ -453,7 +456,15 @@ fn parse_map_contributions(
     let mut sections: std::collections::HashMap<String, u64> = std::collections::HashMap::new();
     let mut tree: std::collections::HashMap<String, std::collections::HashMap<String, u64>> =
         std::collections::HashMap::new();
-    let memory_regions = parse_memory_regions(&contents);
+    let mut memory_regions = parse_memory_regions(&contents);
+    let region_used = compute_region_usage_from_map(&contents, &memory_regions);
+    for region in memory_regions.iter_mut() {
+        if region.used.is_none() {
+            if let Some(used) = region_used.get(&region.name.to_ascii_lowercase()) {
+                region.used = Some(*used);
+            }
+        }
+    }
 
     for line in contents.lines() {
         let trimmed = line.trim_start();
@@ -596,16 +607,28 @@ fn parse_memory_regions(contents: &str) -> Vec<MemoryRegion> {
     let mut in_section = false;
     let mut header_seen = false;
     let mut has_used = false;
+    let mut simple_table = false;
 
     for line in contents.lines() {
         let trimmed = line.trim();
         if trimmed.starts_with("Memory Configuration") {
             in_section = true;
+            header_seen = false;
+            has_used = false;
+            simple_table = false;
+            continue;
+        }
+        if trimmed.starts_with("Memory region") {
+            in_section = true;
+            header_seen = true;
+            has_used = true;
+            simple_table = true;
             continue;
         }
         if in_section && trimmed.starts_with("Name") {
             header_seen = true;
             has_used = trimmed.to_ascii_lowercase().contains("used");
+            simple_table = false;
             continue;
         }
         if in_section && header_seen {
@@ -613,13 +636,15 @@ fn parse_memory_regions(contents: &str) -> Vec<MemoryRegion> {
                 break;
             }
             let parts: Vec<&str> = trimmed.split_whitespace().collect();
-            if parts.len() < 3 {
+            if parts.is_empty() {
                 continue;
             }
-            let name = parts[0].to_string();
-            let origin = parts[1].to_string();
-            let length = parse_hex_or_dec(parts[2]);
-            let used = if has_used { find_used_value(&parts) } else { None };
+            let name = parts[0].trim_end_matches(':').to_string();
+            let (origin, length, used) = if has_used {
+                parse_region_with_usage(&parts)
+            } else {
+                parse_region_legacy(&parts)
+            };
             if name.to_ascii_lowercase() == "default" && used.unwrap_or(0) == 0 {
                 continue;
             }
@@ -630,18 +655,130 @@ fn parse_memory_regions(contents: &str) -> Vec<MemoryRegion> {
                 used,
             });
         }
+        if in_section && simple_table && trimmed.is_empty() {
+            break;
+        }
     }
 
     regions
 }
 
-fn find_used_value(parts: &[&str]) -> Option<u64> {
-    for part in parts.iter().rev() {
-        if let Some(value) = parse_optional_number(part) {
-            return Some(value);
+fn compute_region_usage_from_map(
+    contents: &str,
+    regions: &[MemoryRegion],
+) -> std::collections::HashMap<String, u64> {
+    let mut ranges = Vec::new();
+    for region in regions {
+        let start = parse_hex_or_dec(&region.origin);
+        if region.length == 0 {
+            continue;
+        }
+        let end = start.saturating_add(region.length);
+        ranges.push((region.name.to_ascii_lowercase(), start, end));
+    }
+
+    let mut used_map: std::collections::HashMap<String, u64> = std::collections::HashMap::new();
+    let mut in_map = false;
+    let mut pending_section = false;
+    for line in contents.lines() {
+        let trimmed = line.trim();
+        if trimmed.starts_with("Linker script and memory map") {
+            in_map = true;
+            continue;
+        }
+        if !in_map {
+            continue;
+        }
+        if trimmed.is_empty() {
+            continue;
+        }
+        if trimmed.starts_with("LOAD")
+            || trimmed.starts_with("START GROUP")
+            || trimmed.starts_with("END GROUP")
+            || trimmed.starts_with("OUTPUT(")
+        {
+            continue;
+        }
+        if !line.starts_with('.') {
+            if pending_section && trimmed.starts_with("0x") {
+                let parts: Vec<&str> = trimmed.split_whitespace().collect();
+                if parts.len() >= 2 && parts[0].starts_with("0x") {
+                    let addr = parse_hex_or_dec(parts[0]);
+                    let size = parse_hex_or_dec(parts[1]);
+                    if size > 0 {
+                        for (name, start, end) in ranges.iter() {
+                            if addr >= *start && addr < *end {
+                                let entry = used_map.entry(name.clone()).or_insert(0);
+                                *entry += size;
+                                break;
+                            }
+                        }
+                    }
+                }
+                pending_section = false;
+            }
+            continue;
+        }
+        let parts: Vec<&str> = trimmed.split_whitespace().collect();
+        if parts.len() < 3 || !parts[1].starts_with("0x") {
+            pending_section = true;
+            continue;
+        }
+        let addr = parse_hex_or_dec(parts[1]);
+        let size = parse_hex_or_dec(parts[2]);
+        if size == 0 {
+            continue;
+        }
+        for (name, start, end) in ranges.iter() {
+            if addr >= *start && addr < *end {
+                let entry = used_map.entry(name.clone()).or_insert(0);
+                *entry += size;
+                break;
+            }
+        }
+        pending_section = false;
+    }
+
+    used_map
+}
+
+fn parse_region_with_usage(parts: &[&str]) -> (String, u64, Option<u64>) {
+    let mut origin = String::from("-");
+    for part in parts.iter().skip(1) {
+        if part.starts_with("0x") {
+            origin = part.to_string();
+            break;
         }
     }
-    None
+
+    let mut sizes = Vec::new();
+    let mut idx = 1;
+    while idx < parts.len() {
+        let token = parts[idx];
+        if token.ends_with('%') {
+            idx += 1;
+            continue;
+        }
+        if let Some((value, consumed)) = parse_size_token(token, parts.get(idx + 1).copied()) {
+            sizes.push(value);
+            idx += consumed;
+            continue;
+        }
+        idx += 1;
+    }
+
+    let used = sizes.get(0).cloned();
+    let length = sizes.get(1).cloned().unwrap_or(0);
+    (origin, length, used)
+}
+
+fn parse_region_legacy(parts: &[&str]) -> (String, u64, Option<u64>) {
+    if parts.len() < 3 {
+        return (String::from("-"), 0, None);
+    }
+    let origin = parts[1].to_string();
+    let length = parse_hex_or_dec(parts[2]);
+    (origin, length, None)
 }
 
 fn parse_optional_number(value: &str) -> Option<u64> {
@@ -775,7 +912,7 @@ fn count_strings_lines(program: &str, elf_path: &str) -> Result<u64, String> {
 }
 
 fn build_cache_key(toolchain: &ToolchainPaths, params: &AnalyzeParams) -> Result<String, String> {
-    let cache_version = "v3";
+    let cache_version = "v7";
     let elf_hash = hash_file(&params.elf_path)?;
     let map_hash = match params.map_path.as_ref().map(|p| p.trim()).filter(|p| !p.is_empty()) {
         Some(path) => hash_file(path)?,
@@ -866,6 +1003,57 @@ fn parse_hex_or_dec(value: &str) -> u64 {
         u64::from_str_radix(hex, 16).unwrap_or(0)
     } else {
         value.parse::<u64>().unwrap_or(0)
+    }
+}
+
+fn parse_size_token(token: &str, next: Option<&str>) -> Option<(u64, usize)> {
+    if let Some(value) = parse_number_with_unit(token) {
+        return Some((value, 1));
+    }
+    if let Some(unit) = next {
+        if let Ok(number) = token.parse::<f64>() {
+            if let Some(multiplier) = unit_multiplier(unit) {
+                return Some(((number * multiplier) as u64, 2));
+            }
+        }
+    }
+    None
+}
+
+fn parse_number_with_unit(token: &str) -> Option<u64> {
+    let trimmed = token.trim();
+    if trimmed.is_empty() {
+        return None;
+    }
+    if let Some(hex) = trimmed.strip_prefix("0x") {
+        return u64::from_str_radix(hex, 16).ok();
+    }
+    let mut split_at = trimmed.len();
+    for (idx, ch) in trimmed.char_indices() {
+        if !ch.is_ascii_digit() && ch != '.' {
+            split_at = idx;
+            break;
+        }
+    }
+    if split_at == trimmed.len() {
+        return trimmed.parse::<u64>().ok();
+    }
+    let (num_part, unit_part) = trimmed.split_at(split_at);
+    let number = num_part.parse::<f64>().ok()?;
+    let multiplier = unit_multiplier(unit_part)?;
+    Some((number * multiplier) as u64)
+}
+
+fn unit_multiplier(unit: &str) -> Option<f64> {
+    match unit.trim().to_ascii_lowercase().as_str() {
+        "b" => Some(1.0),
+        "kb" => Some(1024.0),
+        "kib" => Some(1024.0),
+        "mb" => Some(1024.0 * 1024.0),
+        "mib" => Some(1024.0 * 1024.0),
+        "gb" => Some(1024.0 * 1024.0 * 1024.0),
+        "gib" => Some(1024.0 * 1024.0 * 1024.0),
+        _ => None,
     }
 }
 
