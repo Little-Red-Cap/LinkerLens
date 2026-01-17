@@ -95,6 +95,7 @@ pub struct MemoryRegion {
     pub origin: String,
     pub length: u64,
     pub used: Option<u64>,
+    pub padding_bytes: Option<u64>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -458,10 +459,18 @@ fn parse_map_contributions(
         std::collections::HashMap::new();
     let mut memory_regions = parse_memory_regions(&contents);
     let region_used = compute_region_usage_from_map(&contents, &memory_regions);
+    let region_padding = compute_region_padding_from_map(&contents, &memory_regions, &region_used);
     for region in memory_regions.iter_mut() {
         if region.used.is_none() {
             if let Some(used) = region_used.get(&region.name.to_ascii_lowercase()) {
                 region.used = Some(*used);
+            }
+        }
+        if region.padding_bytes.is_none() {
+            if let Some(padding) = region_padding.get(&region.name.to_ascii_lowercase()) {
+                if *padding > 0 {
+                    region.padding_bytes = Some(*padding);
+                }
             }
         }
     }
@@ -653,6 +662,7 @@ fn parse_memory_regions(contents: &str) -> Vec<MemoryRegion> {
                 origin,
                 length,
                 used,
+                padding_bytes: None,
             });
         }
         if in_section && simple_table && trimmed.is_empty() {
@@ -740,6 +750,106 @@ fn compute_region_usage_from_map(
     }
 
     used_map
+}
+
+fn compute_region_padding_from_map(
+    contents: &str,
+    regions: &[MemoryRegion],
+    used_map: &std::collections::HashMap<String, u64>,
+) -> std::collections::HashMap<String, u64> {
+    let mut ranges = Vec::new();
+    for region in regions {
+        let start = parse_hex_or_dec(&region.origin);
+        if region.length == 0 {
+            continue;
+        }
+        let end = start.saturating_add(region.length);
+        ranges.push((region.name.to_ascii_lowercase(), start, end));
+    }
+
+    let mut max_end_map: std::collections::HashMap<String, u64> = std::collections::HashMap::new();
+    let mut in_map = false;
+    let mut pending_section = false;
+    for line in contents.lines() {
+        let trimmed = line.trim();
+        if trimmed.starts_with("Linker script and memory map") {
+            in_map = true;
+            continue;
+        }
+        if !in_map {
+            continue;
+        }
+        if trimmed.is_empty() {
+            continue;
+        }
+        if trimmed.starts_with("LOAD")
+            || trimmed.starts_with("START GROUP")
+            || trimmed.starts_with("END GROUP")
+            || trimmed.starts_with("OUTPUT(")
+        {
+            continue;
+        }
+        if !line.starts_with('.') {
+            if pending_section && trimmed.starts_with("0x") {
+                let parts: Vec<&str> = trimmed.split_whitespace().collect();
+                if parts.len() >= 2 && parts[0].starts_with("0x") {
+                    let addr = parse_hex_or_dec(parts[0]);
+                    let size = parse_hex_or_dec(parts[1]);
+                    if size > 0 {
+                        let end = addr.saturating_add(size);
+                        for (name, start, end_limit) in ranges.iter() {
+                            if addr >= *start && addr < *end_limit {
+                                let entry = max_end_map.entry(name.clone()).or_insert(0);
+                                if end > *entry {
+                                    *entry = end;
+                                }
+                                break;
+                            }
+                        }
+                    }
+                }
+                pending_section = false;
+            }
+            continue;
+        }
+        let parts: Vec<&str> = trimmed.split_whitespace().collect();
+        if parts.len() < 3 || !parts[1].starts_with("0x") {
+            pending_section = true;
+            continue;
+        }
+        let addr = parse_hex_or_dec(parts[1]);
+        let size = parse_hex_or_dec(parts[2]);
+        if size == 0 {
+            continue;
+        }
+        let end = addr.saturating_add(size);
+        for (name, start, end_limit) in ranges.iter() {
+            if addr >= *start && addr < *end_limit {
+                let entry = max_end_map.entry(name.clone()).or_insert(0);
+                if end > *entry {
+                    *entry = end;
+                }
+                break;
+            }
+        }
+        pending_section = false;
+    }
+
+    let mut padding_map: std::collections::HashMap<String, u64> = std::collections::HashMap::new();
+    for (name, start, _) in ranges {
+        if let Some(max_end) = max_end_map.get(&name) {
+            if *max_end <= start {
+                continue;
+            }
+            let span = max_end.saturating_sub(start);
+            let used = used_map.get(&name).copied().unwrap_or(0);
+            if span > used {
+                padding_map.insert(name, span - used);
+            }
+        }
+    }
+
+    padding_map
 }
 
 fn parse_region_with_usage(parts: &[&str]) -> (String, u64, Option<u64>) {
@@ -912,7 +1022,7 @@ fn count_strings_lines(program: &str, elf_path: &str) -> Result<u64, String> {
 }
 
 fn build_cache_key(toolchain: &ToolchainPaths, params: &AnalyzeParams) -> Result<String, String> {
-    let cache_version = "v9";
+    let cache_version = "v10";
     let elf_hash = hash_file(&params.elf_path)?;
     let map_hash = match params.map_path.as_ref().map(|p| p.trim()).filter(|p| !p.is_empty()) {
         Some(path) => hash_file(path)?,

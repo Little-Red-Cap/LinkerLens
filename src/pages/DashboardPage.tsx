@@ -1,4 +1,4 @@
-﻿import { Card, Col, Divider, Empty, Progress, Row, Space, Table, Tag, Tooltip, Typography } from "antd";
+﻿import { Card, Col, Divider, Empty, Progress, Row, Segmented, Space, Table, Tag, Tooltip, Typography } from "antd";
 import { useState } from "react";
 import { InfoCircleOutlined } from "@ant-design/icons";
 import { uiText } from "../domain/uiI18n";
@@ -34,7 +34,9 @@ export default function DashboardPage() {
     const status = useAnalysisStore((s) => s.status);
     const lastError = useAnalysisStore((s) => s.lastError);
     const [showUsedBytes, setShowUsedBytes] = useState(false);
+    const [usageBasis, setUsageBasis] = useState<"vma" | "ld">("vma");
     const toggleUsedUnit = () => setShowUsedBytes((prev) => !prev);
+    const usageNoteKey = usageBasis === "ld" ? "dashRegionsUsageNoteLd" : "dashRegionsUsageNoteVma";
     const totals = result?.summary.sections_totals;
     const symbols = result?.summary.top_symbols ?? [];
     const regions = result?.summary.memory_regions ?? [];
@@ -94,7 +96,7 @@ export default function DashboardPage() {
         {
             title: uiText(language, "dashRegionUsed"),
             key: "used",
-            render: (_: unknown, record: { used?: number | null; length: number; name: string }) => {
+            render: (_: unknown, record: { used?: number | null; length: number; name: string; padding_bytes?: number | null }) => {
                 const usedValue = record.used ?? estimateRegionUsed(record.name);
                 if (!usedValue) {
                     return (
@@ -103,9 +105,20 @@ export default function DashboardPage() {
                         </Typography.Text>
                     );
                 }
-                const percent = record.length > 0 ? Math.min(100, (usedValue / record.length) * 100) : 0;
-                const over = usedValue > record.length;
-                const usedLabel = showUsedBytes ? `${usedValue} B` : formatBytes(usedValue);
+                const isFlash = /flash|rom/i.test(record.name);
+                const usedFromEstimate = record.used == null;
+                const paddingBytes = record.padding_bytes ?? 0;
+                const includePadding = usageBasis === "ld" && !usedFromEstimate;
+                let adjustedUsed = usedValue;
+                if (usageBasis === "ld" && isFlash && !usedFromEstimate) {
+                    adjustedUsed += totals?.data_bytes ?? 0;
+                }
+                if (includePadding) {
+                    adjustedUsed += paddingBytes;
+                }
+                const percent = record.length > 0 ? Math.min(100, (adjustedUsed / record.length) * 100) : 0;
+                const over = adjustedUsed > record.length;
+                const usedLabel = showUsedBytes ? `${adjustedUsed} B` : formatBytes(adjustedUsed);
                 const lengthLabel = showUsedBytes ? `${record.length} B` : formatBytes(record.length);
                 return (
                     <div
@@ -193,14 +206,21 @@ export default function DashboardPage() {
             <Card className="pageCard riseIn" style={{ animationDelay: "260ms" }}>
                 <Space size="small" align="center" wrap>
                     <Typography.Title level={4}>{uiText(language, "dashRegionsTitle")}</Typography.Title>
-                    <Tooltip title={uiText(language, "dashRegionsUsageNote")}>
+                    <Tooltip title={uiText(language, usageNoteKey)}>
                         <InfoCircleOutlined style={{ color: "rgba(0, 0, 0, 0.45)" }} />
                     </Tooltip>
-                    <Tooltip title={uiText(language, "dashRegionsUsageNote")}>
-                        <Typography.Text type="secondary" style={{ cursor: "help" }}>
-                            统计口径
-                        </Typography.Text>
-                    </Tooltip>
+                    <Space size="small" align="center">
+                        <Typography.Text type="secondary">{uiText(language, "dashRegionsBasisLabel")}</Typography.Text>
+                        <Segmented
+                            size="small"
+                            value={usageBasis}
+                            onChange={(value) => setUsageBasis(value as "vma" | "ld")}
+                            options={[
+                                { label: uiText(language, "dashRegionsBasisVma"), value: "vma" },
+                                { label: uiText(language, "dashRegionsBasisLd"), value: "ld" },
+                            ]}
+                        />
+                    </Space>
                 </Space>
                 <Typography.Text type="secondary">{uiText(language, "dashRegionsHint")}</Typography.Text>
                 <Divider />

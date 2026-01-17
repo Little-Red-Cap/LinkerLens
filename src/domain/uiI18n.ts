@@ -81,6 +81,11 @@ export type UiKey =
     | "dashRegionsTitle"
     | "dashRegionsHint"
     | "dashRegionsUsageNote"
+    | "dashRegionsBasisLabel"
+    | "dashRegionsBasisVma"
+    | "dashRegionsBasisLd"
+    | "dashRegionsUsageNoteVma"
+    | "dashRegionsUsageNoteLd"
     | "dashRegionName"
     | "dashRegionOrigin"
     | "dashRegionLength"
@@ -207,6 +212,11 @@ const zh: Record<UiKey, string> = {
     dashRegionsTitle: "内存区域",
     dashRegionsHint: "来自 MAP 的内存区域配置与占用。",
     dashRegionsUsageNote: "已用统计按 VMA 归属区域，不包含对齐填充；FLASH 不含 .data 的 LMA 镜像。",
+    dashRegionsBasisLabel: "统计口径",
+    dashRegionsBasisVma: "VMA",
+    dashRegionsBasisLd: "LD",
+    dashRegionsUsageNoteVma: "按 VMA 归属区域统计，不包含对齐填充；FLASH 不含 .data 的 LMA 镜像。",
+    dashRegionsUsageNoteLd: "按 VMA 统计，FLASH 额外计入 .data 的 LMA 镜像，并计入对齐填充。",
     dashRegionName: "区域",
     dashRegionOrigin: "起始",
     dashRegionLength: "长度",
@@ -334,6 +344,11 @@ const en: Record<UiKey, string> = {
     dashRegionsTitle: "Memory Regions",
     dashRegionsHint: "Memory regions from MAP and their usage.",
     dashRegionsUsageNote: "Used values follow VMA regions, excluding alignment padding; FLASH does not include .data LMA images.",
+    dashRegionsBasisLabel: "Basis",
+    dashRegionsBasisVma: "VMA",
+    dashRegionsBasisLd: "LD",
+    dashRegionsUsageNoteVma: "Uses VMA region totals; alignment padding excluded; FLASH excludes .data LMA images.",
+    dashRegionsUsageNoteLd: "Uses VMA totals, adds .data LMA images to FLASH, and includes alignment padding.",
     dashRegionName: "Region",
     dashRegionOrigin: "Origin",
     dashRegionLength: "Length",
