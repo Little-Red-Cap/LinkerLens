@@ -1,4 +1,4 @@
-﻿import { Button, Card, Col, Input, Row, Select, Space, Table, Tooltip, Typography } from "antd";
+﻿import { Button, Card, Col, Descriptions, Drawer, Input, Row, Select, Space, Table, Tooltip, Typography } from "antd";
 import { invoke } from "@tauri-apps/api/core";
 import { useEffect, useState } from "react";
 import { uiText } from "../domain/uiI18n";
@@ -52,6 +52,7 @@ export default function SymbolsPage() {
     const [typeFilter, setTypeFilter] = useState<string | null>(null);
     const [facets, setFacets] = useState<SymbolFacets>({ sections: [], kinds: [] });
     const [facetLoading, setFacetLoading] = useState(false);
+    const [selectedSymbol, setSelectedSymbol] = useState<SymbolInfo | null>(null);
 
     const columns = [
         {
@@ -113,17 +114,17 @@ export default function SymbolsPage() {
             try {
                 const result = await invoke<PagedSymbols>("list_symbols", {
                     query: {
-                    query: search || null,
-                    page,
-                    page_size: pageSize,
-                    sort: sortKey,
-                    order: sortOrder,
-                    section: sectionFilter,
-                    kind: typeFilter,
-                },
-            });
-            setData(result.items || []);
-            setTotal(result.total || 0);
+                        query: search || null,
+                        page,
+                        page_size: pageSize,
+                        sort: sortKey,
+                        order: sortOrder,
+                        section: sectionFilter,
+                        kind: typeFilter,
+                    },
+                });
+                setData(result.items || []);
+                setTotal(result.total || 0);
             } finally {
                 setLoading(false);
             }
@@ -232,6 +233,9 @@ export default function SymbolsPage() {
                         setSortOrder(nextOrder);
                         setPage(1);
                     }}
+                    onRow={(record) => ({
+                        onClick: () => setSelectedSymbol(record),
+                    })}
                     pagination={{
                         current: page,
                         pageSize,
@@ -247,6 +251,41 @@ export default function SymbolsPage() {
                     }}
                 />
             </Card>
+            <Drawer
+                open={Boolean(selectedSymbol)}
+                onClose={() => setSelectedSymbol(null)}
+                width={420}
+                title={uiText(language, "symbolsDetailTitle")}
+            >
+                {selectedSymbol ? (
+                    <Space direction="vertical" size="small" className="pageStack">
+                        <Typography.Text type="secondary">{uiText(language, "symbolsDetailHint")}</Typography.Text>
+                        <Descriptions column={1} size="small">
+                            <Descriptions.Item label={uiText(language, "symbolsDetailName")}>
+                                {selectedSymbol.name}
+                            </Descriptions.Item>
+                            <Descriptions.Item label={uiText(language, "symbolsDetailAddress")}>
+                                {selectedSymbol.addr ? `0x${selectedSymbol.addr}` : "--"}
+                            </Descriptions.Item>
+                            <Descriptions.Item label={uiText(language, "symbolsDetailSize")}>
+                                {selectedSymbol.size > 0 ? (
+                                    formatBytes(selectedSymbol.size)
+                                ) : (
+                                    <Tooltip title={uiText(language, "symbolsNoSizeNote")}>
+                                        <Typography.Text type="secondary">--</Typography.Text>
+                                    </Tooltip>
+                                )}
+                            </Descriptions.Item>
+                            <Descriptions.Item label={uiText(language, "symbolsDetailType")}>
+                                {selectedSymbol.kind}
+                            </Descriptions.Item>
+                            <Descriptions.Item label={uiText(language, "symbolsDetailSection")}>
+                                {selectedSymbol.section_guess || "--"}
+                            </Descriptions.Item>
+                        </Descriptions>
+                    </Space>
+                ) : null}
+            </Drawer>
         </Space>
     );
 }

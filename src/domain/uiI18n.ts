@@ -106,6 +106,13 @@ export type UiKey =
     | "symbolsColumnSection"
     | "symbolsAbsoluteNote"
     | "symbolsNoSizeNote"
+    | "symbolsDetailTitle"
+    | "symbolsDetailHint"
+    | "symbolsDetailName"
+    | "symbolsDetailAddress"
+    | "symbolsDetailSize"
+    | "symbolsDetailType"
+    | "symbolsDetailSection"
     | "objectsMapTitle"
     | "objectsMapHint"
     | "objectsMapEmpty"
@@ -242,6 +249,13 @@ const zh: Record<UiKey, string> = {
     symbolsColumnSection: "段",
     symbolsAbsoluteNote: "绝对符号，无大小",
     symbolsNoSizeNote: "该符号无有效大小",
+    symbolsDetailTitle: "符号详情",
+    symbolsDetailHint: "点击表格行即可查看符号详情。",
+    symbolsDetailName: "名称",
+    symbolsDetailAddress: "地址",
+    symbolsDetailSize: "大小",
+    symbolsDetailType: "类型",
+    symbolsDetailSection: "段",
     objectsMapTitle: "贡献树图",
     objectsMapHint: "Treemap 展示库、对象文件与段的层级关系。",
     objectsMapEmpty: "MAP 解析后显示 Treemap。",
@@ -379,6 +393,13 @@ const en: Record<UiKey, string> = {
     symbolsColumnSection: "Section",
     symbolsAbsoluteNote: "Absolute symbol, no size",
     symbolsNoSizeNote: "Symbol has no meaningful size",
+    symbolsDetailTitle: "Symbol Details",
+    symbolsDetailHint: "Select a row to view symbol details.",
+    symbolsDetailName: "Name",
+    symbolsDetailAddress: "Address",
+    symbolsDetailSize: "Size",
+    symbolsDetailType: "Type",
+    symbolsDetailSection: "Section",
     objectsMapTitle: "Contribution Map",
     objectsMapHint: "Treemap view of libraries, object files, and sections.",
     objectsMapEmpty: "Treemap will appear after MAP parsing.",
