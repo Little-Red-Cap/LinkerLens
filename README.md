@@ -41,6 +41,8 @@ LinkerLens 让你用更直观的方式读懂固件：输入 `.elf` 与 `.map`，
 3. 进入“符号分析”筛选大符号
 4. 使用“PC 地址反查”定位崩溃点
 
+## 软件截图
+![Dashboard](doc/images/Dashboard.png)
 
 ## 嵌入式开发黑科技手册
 
@@ -330,6 +332,7 @@ uint8_t huge_buffer[1024*1024];
 
 
 ---
+
 
 ## 技术栈
 Tauri + React + Ant Design + Vite
